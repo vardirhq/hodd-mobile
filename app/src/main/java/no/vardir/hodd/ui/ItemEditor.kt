@@ -72,7 +72,7 @@ internal fun ItemEditor(
     fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else cancel() } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        result.contents?.let { barcode = it; message("Barcode captured. Open Find and fill details to look it up, or enter details yourself.") }
+        result.contents?.let { barcode = it; message("Identifier inserted.") }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) { importing = true; importPhoto(uri) { if (it != null) photoName = it; importing = false } }
@@ -111,11 +111,7 @@ internal fun ItemEditor(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
-            Text("Scan a barcode, read a cover, or add details yourself. Your collection is stored on this device.", color = Muted)
-            OutlinedButton(onClick = {
-                try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES).setPrompt("Scan an item’s barcode").setBeepEnabled(false).setOrientationLocked(false)) }
-                catch (_: Exception) { message("Camera unavailable. You can enter the barcode below.") }
-            }, enabled = !busy && !assisting, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan barcode") }
+            Text("Read a cover, identify an item, or add details yourself. Your collection is stored on this device.", color = Muted)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Cover(draft.copy(title = title.ifBlank { "Your next find" }), photo(photoName), Modifier.width(95.dp).height(130.dp))
                 Column(Modifier.weight(1f)) {
@@ -169,7 +165,15 @@ subtitle = next.subtitle; series = next.series; volume = next.volume; publisher 
                 ItemStatus.entries.forEach { value -> FilterChip(selected = status == value, onClick = { statusName = value.name }, label = { Text(value.label) }) }
             }
             if (status == ItemStatus.LENT) OutlinedTextField(lentTo, { lentTo = it }, label = { Text("Lent to *") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(barcode, { barcode = it }, label = { Text("Barcode / ISBN") }, supportingText = { Text("Use Find and fill details to look up a book or music barcode. Clear the barcode to search by title.") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(barcode, { barcode = it }, label = { Text("EAN / ISBN") },
+                    supportingText = { Text("Optional identifier. Search prioritizes title and creator.") },
+                    modifier = Modifier.weight(1f), singleLine = true)
+                IconButton(onClick = {
+                    try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES).setPrompt("Scan EAN or ISBN").setBeepEnabled(false).setOrientationLocked(false)) }
+                    catch (_: Exception) { message("Camera unavailable. Enter the identifier manually.") }
+                }, enabled = !busy && !assisting) { Icon(Icons.Outlined.QrCodeScanner, "Scan EAN / ISBN") }
+            }
             OutlinedTextField(notes, { notes = it }, label = { Text("Notes / condition") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
         }
     }
