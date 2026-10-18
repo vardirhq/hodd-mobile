@@ -43,22 +43,25 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
     var page by rememberSaveable { mutableStateOf("home") }
     var collectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var itemId by rememberSaveable { mutableStateOf<String?>(null) }
+    var detailReturn by rememberSaveable { mutableStateOf("home") }
+    var collectionReturn by rememberSaveable { mutableStateOf("home") }
     var query by rememberSaveable { mutableStateOf("") }
     var newCollection by rememberSaveable { mutableStateOf(false) }
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val collection = catalog.collections.find { it.id == collectionId }
     val item = catalog.items.find { it.id == itemId }
-    fun openItem(value: CatalogItem) { itemId = value.id; page = "detail" }
-    fun openCollection(value: Collection) { collectionId = value.id; query = ""; page = "collection" }
+    fun openItem(value: CatalogItem) { detailReturn = page; itemId = value.id; page = "detail" }
+    fun openCollection(value: Collection) { collectionReturn = page; collectionId = value.id; query = ""; page = "collection" }
     fun addItem() {
         if (catalog.collections.isEmpty()) newCollection = true
-        else { itemId = null; page = "edit" }
+        else { detailReturn = page; itemId = null; page = "edit" }
     }
     fun back() {
         page = when (page) {
-            "edit" -> if (item != null) "detail" else if (collection != null) "collection" else "home"
-            "detail" -> if (collection != null) "collection" else "home"
+            "edit" -> if (item != null) "detail" else detailReturn
+            "detail" -> detailReturn
+            "collection" -> collectionReturn
             else -> "home"
         }
     }
@@ -111,13 +114,13 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                     "home" -> HomeScreen(catalog, query, { query = it }, ::openCollection, ::openItem, { collectionId = null; page = "collection" }, { newCollection = true }, vm::loadExamples, vm.repository::photo)
                     "collections" -> CollectionsScreen(catalog, ::openCollection, { newCollection = true })
                     "collection", "wishlist" -> ItemsScreen(catalog, if (page == "wishlist") null else collection, page == "wishlist", query, { query = it }, ::openItem, ::addItem, vm.repository::photo)
-                    "detail" -> if (item != null) ItemDetail(item, catalog.collections.find { it.id == item.collectionId }?.name.orEmpty(), vm.repository.photo(item.photoName), { page = "edit" }, { vm.deleteItem(item.id) { page = if (collection != null) "collection" else "home" } }, busy)
+                    "detail" -> if (item != null) ItemDetail(item, catalog.collections.find { it.id == item.collectionId }?.name.orEmpty(), vm.repository.photo(item.photoName), { page = "edit" }, { vm.deleteItem(item.id) { page = detailReturn } }, busy)
                     "edit" -> ItemEditor(item, catalog.collections, collectionId, busy, vm.repository::photo, { uri, done -> vm.photo(uri, done) }, { saved -> vm.save(saved) { itemId = saved.id; collectionId = saved.collectionId; page = "detail" } }, { back() }, { message -> scope.launch { snack.showSnackbar(message) } })
                 }
             }
         }
     }
-    if (newCollection) NewCollectionDialog(busy, { newCollection = false }) { name -> vm.addCollection(name) { newCollection = false; collectionId = vm.catalog.value.collections.last().id; page = "collection"; query = "" } }
+    if (newCollection) NewCollectionDialog(busy, catalog.collections.map { it.name }, { newCollection = false }) { name -> vm.addCollection(name) { newCollection = false; collectionReturn = page; collectionId = vm.catalog.value.collections.last().id; page = "collection"; query = "" } }
 }
 
 @Composable
@@ -303,7 +306,8 @@ internal fun EmptyState(icon: ImageVector, title: String, body: String, action: 
 }
 
 @Composable
-private fun NewCollectionDialog(busy: Boolean, dismiss: () -> Unit, save: (String) -> Unit) {
+private fun NewCollectionDialog(busy: Boolean, names: List<String>, dismiss: () -> Unit, save: (String) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
-    AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("Make room for a collection", style = MaterialTheme.typography.titleLarge) }, text = { OutlinedTextField(name, { name = it }, label = { Text("Collection name") }, placeholder = { Text("Books, games, vinyl…") }, singleLine = true) }, confirmButton = { TextButton(onClick = { save(name) }, enabled = name.isNotBlank() && !busy) { Text("Create") } }, dismissButton = { TextButton(onClick = dismiss, enabled = !busy) { Text("Cancel") } })
+    val duplicate = name.isNotBlank() && names.any { it.equals(name.trim(), ignoreCase = true) }
+    AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("Make room for a collection", style = MaterialTheme.typography.titleLarge) }, text = { OutlinedTextField(name, { name = it }, label = { Text("Collection name") }, placeholder = { Text("Books, games, vinyl…") }, singleLine = true, isError = duplicate, supportingText = { if (duplicate) Text("A collection with this name already exists.") }) }, confirmButton = { TextButton(onClick = { save(name) }, enabled = name.isNotBlank() && !duplicate && !busy) { Text("Create") } }, dismissButton = { TextButton(onClick = dismiss, enabled = !busy) { Text("Cancel") } })
 }
