@@ -62,7 +62,7 @@ internal fun GuidedFieldCamera(
                 }
             } catch (error: Exception) { onError("Could not start the camera.") }
         }
-        providerFuture.addListener(listener, executor)
+        previewView.post { providerFuture.addListener(listener, executor) }
         onDispose {
             capture = null
             if (providerFuture.isDone) {
