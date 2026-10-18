@@ -27,6 +27,14 @@ data class CatalogItem(
     val metadataSource: String = "",
     val metadataId: String = "",
     val metadataUrl: String = "",
+    val subtitle: String = "",
+    val series: String = "",
+    val volume: String = "",
+    val publisher: String = "",
+    val language: String = "",
+    val releaseYear: String = "",
+    val condition: String = "",
+    val attributes: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -53,7 +61,7 @@ data class Catalog(val version: Int = 1, val collections: List<Collection> = emp
         val terms = query.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         return items.filter { item ->
             (collectionId == null || item.collectionId == collectionId) && (status == null || item.status == status) &&
-                terms.all { term -> listOf(item.title, item.creator, item.barcode, item.kind, item.format, item.notes).any { it.contains(term, ignoreCase = true) } }
+                terms.all { term -> listOf(item.title, item.creator, item.barcode, item.kind, item.format, item.notes, item.subtitle, item.series, item.volume, item.publisher, item.language, item.releaseYear, item.condition).plus(item.attributes.values).any { it.contains(term, ignoreCase = true) } }
         }.sortedByDescending { it.addedAt }
     }
 
