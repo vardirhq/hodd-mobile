@@ -1,5 +1,7 @@
 package no.vardir.hodd.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -19,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import no.vardir.hodd.core.CatalogItem
@@ -66,6 +69,22 @@ internal fun ItemEditor(
         if (success && name != null) photoName = name else photo(name)?.delete()
         pendingPhoto = null
     }
+    fun takePhoto() {
+        try {
+            val name = "${UUID.randomUUID()}.jpg"
+            val target = photo(name)!!
+            target.parentFile!!.mkdirs()
+            pendingPhoto = name
+            camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", target))
+        } catch (_: Exception) {
+            pendingPhoto = null
+            message("Could not open the camera. Choose an existing photo instead.")
+        }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) takePhoto()
+        else message("Camera access was not granted. You can choose an existing photo instead.")
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
@@ -91,13 +110,8 @@ internal fun ItemEditor(
                     Text("Use a photo or keep the simple cover.", color = Muted, style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy && !importing) { Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Choose photo") }
                     TextButton(onClick = {
-                        try {
-                            val name = "${UUID.randomUUID()}.jpg"
-                            val target = photo(name)!!
-                            target.parentFile!!.mkdirs()
-                            pendingPhoto = name
-                            camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", target))
-                        } catch (_: Exception) { pendingPhoto = null; message("No camera app is available. Choose an existing photo instead.") }
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
+                        else cameraPermission.launch(Manifest.permission.CAMERA)
                     }, enabled = !busy && !importing) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
                     if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy) { Text("Remove photo") }
                 }
