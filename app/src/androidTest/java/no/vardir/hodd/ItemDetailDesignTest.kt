@@ -49,15 +49,15 @@ class ItemDetailDesignTest {
         compose.onNodeWithText(item.title).performScrollTo().performClick()
         compose.onNodeWithTag("item-title").assertTextEquals(item.title)
         capture("08-detail-hero")
-        compose.onNodeWithText("ON LOAN").performScrollTo().assertExists()
+        reveal("ON LOAN").assertExists()
         compose.onNodeWithText("Unsure").assertExists()
-        compose.onNodeWithText("Nintendo Switch").performScrollTo().assertExists()
+        reveal("Nintendo Switch").assertExists()
         capture("09-detail-metadata")
-        compose.onNodeWithText("About this edition").performScrollTo().assertExists()
-        compose.onNodeWithText("The Legend of Zelda").performScrollTo().assertExists()
-        compose.onNodeWithText("Identifiers & source").performScrollTo().performClick()
-        compose.onNodeWithText("123456789").performScrollTo().assertExists()
-        compose.onNodeWithText("https://example.org/item").performScrollTo().assertExists()
+        reveal("About this edition").assertExists()
+        reveal("The Legend of Zelda").assertExists()
+        reveal("Identifiers & source").performClick()
+        reveal("123456789").assertExists()
+        reveal("https://example.org/item").assertExists()
         compose.onNodeWithTag("detail-edit").assertIsDisplayed().performClick()
         compose.onNodeWithText("Title *").assertTextContains(item.title)
         compose.runOnIdle {
@@ -79,10 +79,15 @@ class ItemDetailDesignTest {
         }
         compose.onNodeWithTag("item-title").performScrollTo().assertExists()
         capture("10-detail-large-text")
-        compose.onNodeWithText("English").performScrollTo().assertExists()
-        compose.onNodeWithText(item.notes).performScrollTo().assertExists()
+        reveal("English").assertExists()
+        reveal(item.notes).assertExists()
         compose.onNodeWithTag("detail-edit").assertIsDisplayed().performClick()
         assertTrue(edited)
+    }
+
+    private fun reveal(text: String): SemanticsNodeInteraction {
+        compose.onNodeWithTag("item-detail-scroll").performScrollToNode(hasText(text))
+        return compose.onNodeWithText(text).performScrollTo()
     }
 
     private fun capture(name: String) {
