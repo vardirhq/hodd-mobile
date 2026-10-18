@@ -146,7 +146,10 @@ internal fun ItemAssistPanel(
             Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(item.title, style = MaterialTheme.typography.titleLarge)
                 listOf("Creator" to item.creator, "Type" to item.kind, "Format" to item.format, "Barcode" to item.barcode,
-                    "Status" to item.status, "Lent to" to item.lentTo, "Notes" to item.notes).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
+                    "Status" to item.status, "Lent to" to item.lentTo, "Notes" to item.notes,
+                    "Subtitle" to item.subtitle, "Series" to item.series, "Volume" to item.volume,
+                    "Publisher" to item.publisher, "Language" to item.language, "Release year" to item.releaseYear,
+                    "Condition" to item.condition).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
                 Text("Source: ${item.source}", style = MaterialTheme.typography.bodySmall, color = Violet)
                 if (item.detail.isNotBlank()) Text(item.detail, style = MaterialTheme.typography.bodySmall)
                 Text("Empty fields are filled by default. Existing details and your photo are kept.", style = MaterialTheme.typography.bodySmall)
