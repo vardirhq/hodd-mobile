@@ -77,12 +77,37 @@ class NanoTextModel : LocalTextModel {
             })
         } ?: error("Local AI took too long. Try a shorter description or use the form.")
         val raw = response.candidates.firstOrNull()?.text.orEmpty()
-        return try { SuggestionCodec.fromLocalAi(raw, kind) }
+        val identity = try { SuggestionCodec.fromLocalAi(raw, kind) }
         catch (error: Exception) {
             Log.e(TAG, "Local AI returned an invalid suggestion (length=${raw.length}, preview=${raw.take(400)})", error)
             throw IllegalStateException("Local AI returned an unusable response: ${error.javaClass.simpleName}: ${error.message?.take(100)}", error)
         }
-            .let { if (description) it else it.copy(status = "", lentTo = "", notes = "") }
+        if (description) return identity
+        return try {
+            val prompt = """
+                Extract ONLY visible cover metadata. Return compact JSON string fields:
+                subtitle, series, volume, publisher, language, releaseYear.
+                Unknown fields must be empty. Do not guess. No markdown.
+                COVER OCR:
+                $text
+            """.trimIndent()
+            val extra = withTimeoutOrNull(15000) {
+                client().generateContent(generateContentRequest(TextPart(prompt)) { maxOutputTokens = 192 })
+            }?.candidates?.firstOrNull()?.text.orEmpty()
+            val rawObject = extra.trim().removePrefix("JSON:").trim()
+            val obj = kotlinx.serialization.json.Json.parseToJsonElement(rawObject) as? kotlinx.serialization.json.JsonObject
+                ?: error("Metadata response was not an object")
+            fun extraField(key: String): String = (obj[key] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.content.orEmpty().take(300)
+            identity.copy(subtitle = extraField("subtitle"), series = extraField("series"),
+                volume = extraField("volume"), publisher = extraField("publisher"),
+                language = extraField("language"), releaseYear = extraField("releaseYear"),
+                status = "", lentTo = "", notes = "")
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Optional local metadata enrichment failed", error)
+            identity.copy(status = "", lentTo = "", notes = "")
+        }
     }
 
     override fun close() { model?.close(); model = null }
