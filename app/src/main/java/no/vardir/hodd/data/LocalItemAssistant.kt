@@ -86,7 +86,8 @@ class NanoTextModel : LocalTextModel {
         return try {
             val prompt = """
                 Extract ONLY visible cover metadata. Return compact JSON string fields:
-                subtitle, series, volume, publisher, language, releaseYear.\n                For $kind also return attributes as a JSON object with visible details only.
+                subtitle, series, volume, publisher, language, releaseYear.
+                For $kind also return attributes as a JSON object with visible details only.
                 Unknown fields must be empty. Do not guess. No markdown.
                 COVER OCR:
                 $text
@@ -102,7 +103,10 @@ class NanoTextModel : LocalTextModel {
             identity.copy(subtitle = extraField("subtitle"), series = extraField("series"),
                 volume = extraField("volume"), publisher = extraField("publisher"),
                 language = extraField("language"), releaseYear = extraField("releaseYear"),
-                attributes = (obj["attributes"] as? kotlinx.serialization.json.JsonObject)?.mapNotNull { (key, value) ->\n                    val content = (value as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().trim()\n                    if (key.matches(Regex("[a-zA-Z][a-zA-Z0-9]{0,39}")) && content.length in 1..300) key to content else null\n                }?.toMap().orEmpty(), status = "", lentTo = "", notes = "")
+                attributes = (obj["attributes"] as? kotlinx.serialization.json.JsonObject)?.mapNotNull { (key, value) ->
+                    val content = (value as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().trim()
+                    if (key.matches(Regex("[a-zA-Z][a-zA-Z0-9]{0,39}")) && content.length in 1..300) key to content else null
+                }?.toMap().orEmpty(), status = "", lentTo = "", notes = "")
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             Log.w(TAG, "Optional local metadata enrichment failed", error)
