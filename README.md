@@ -17,7 +17,7 @@ A native Android home for the things you collect. Built with Kotlin and Jetpack 
 - Describe an item naturally to propose fields using on-device AI on supported devices.
 - Use every collection feature offline, without an account or server.
 
-After scanning, open **Find and fill details → Find online** to look up the code. For a title search, clear the barcode and enter a title (and optionally creator). Select Book/Comic for Open Library or CD/Vinyl for MusicBrainz. Games and movies currently support local cover recognition and manual entry, not online metadata lookup.
+Open **Find and fill details → Find online** to search by title and optionally creator. Title search takes priority even if an EAN/ISBN is present. With the title left empty, lookup can use a scanned or manually entered identifier. Select Book/Comic for Open Library or CD/Vinyl for MusicBrainz. Games and movies currently support local cover recognition and manual entry, not online metadata lookup.
 
 Suggestions are reviewed before they fill the form. Existing values and photos are preserved unless replacement is explicitly selected. Nothing is saved until you tap Save. Open Library returns work-level matches: check your physical edition and cover. Community catalogs have gaps, and music barcodes can identify multiple releases.
 

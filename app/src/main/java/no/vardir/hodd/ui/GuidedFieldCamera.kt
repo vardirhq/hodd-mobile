@@ -118,12 +118,12 @@ internal fun GuidedFieldCamera(
                     camera.takePicture(ImageCapture.OutputFileOptions.Builder(output).build(),
                         ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
                             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                                if (!disposed) { capturing = false; capturedCallback(output) }
+                                if (active.value) { capturing = false; capturedCallback(output) }
                                 else output.delete()
                             }
                             override fun onError(exception: androidx.camera.core.ImageCaptureException) {
                                 output.delete()
-                                if (!disposed) { capturing = false; errorCallback("Could not capture text. Try again.") }
+                                if (active.value) { capturing = false; errorCallback("Could not capture text. Try again.") }
                             }
                         })
                 }, enabled = capture != null && !capturing, shape = RoundedCornerShape(40.dp)) {
