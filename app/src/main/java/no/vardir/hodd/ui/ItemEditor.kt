@@ -27,6 +27,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.Collection
 import no.vardir.hodd.core.ItemStatus
+import no.vardir.hodd.core.withSuggestion
 import java.io.File
 import java.util.UUID
 
@@ -52,14 +53,18 @@ internal fun ItemEditor(
     var photoName by rememberSaveable(draftId) { mutableStateOf(existing?.photoName) }
     var pendingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
+    var assisting by remember { mutableStateOf(false) }
+    var metadataSource by rememberSaveable(draftId) { mutableStateOf(existing?.metadataSource.orEmpty()) }
+    var metadataId by rememberSaveable(draftId) { mutableStateOf(existing?.metadataId.orEmpty()) }
+    var metadataUrl by rememberSaveable(draftId) { mutableStateOf(existing?.metadataUrl.orEmpty()) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val status = ItemStatus.valueOf(statusName)
-    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt)
+    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl)
     val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null
-    fun close() { if (!busy && !importing) { if (dirty) discard = true else cancel() } }
+    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else cancel() } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        result.contents?.let { barcode = it; message("Barcode captured. Add the item details, then save.") }
+        result.contents?.let { barcode = it; message("Barcode captured. Open Find and fill details to look it up, or enter details yourself.") }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) { importing = true; importPhoto(uri) { if (it != null) photoName = it; importing = false } }
@@ -86,11 +91,11 @@ internal fun ItemEditor(
         else message("Camera access was not granted. You can choose an existing photo instead.")
     }
     Scaffold(
-        topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing) { Icon(Icons.Outlined.Close, "Cancel") } }) },
+        topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
             Surface(shadowElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
-                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
-                    if (busy || importing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
+                    if (busy || importing || assisting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     else { Icon(Icons.Outlined.Check, null); Spacer(Modifier.width(8.dp)); Text(if (existing == null) "Save to collection" else "Save changes") }
                 }
             }
@@ -98,35 +103,42 @@ internal fun ItemEditor(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
-            Text("Scan a barcode or add the details yourself. Everything stays on this device.", color = Muted)
+            Text("Scan a barcode, read a cover, or add details yourself. Your collection is stored on this device.", color = Muted)
             OutlinedButton(onClick = {
                 try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES).setPrompt("Scan an item’s barcode").setBeepEnabled(false).setOrientationLocked(false)) }
                 catch (_: Exception) { message("Camera unavailable. You can enter the barcode below.") }
-            }, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan barcode") }
+            }, enabled = !busy && !assisting, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan barcode") }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Cover(draft.copy(title = title.ifBlank { "Your next find" }), photo(photoName), Modifier.width(95.dp).height(130.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Your cover", style = MaterialTheme.typography.titleMedium)
                     Text("Use a photo or keep the simple cover.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy && !importing) { Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Choose photo") }
+                    TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Choose photo") }
                     TextButton(onClick = {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
                         else cameraPermission.launch(Manifest.permission.CAMERA)
-                    }, enabled = !busy && !importing) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
+                    }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
                     if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy) { Text("Remove photo") }
                 }
             }
             OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             ChoiceMenu("Collection", collections.find { it.id == selectedCollection }?.name.orEmpty(), collections.map { it.id to it.name }) { selectedCollection = it }
-            ChoiceMenu("Type", kind, listOf("Book", "Game", "Movie", "Vinyl", "Comic", "Coin", "Other").map { it to it }) { kind = it }
+            ChoiceMenu("Type", kind, listOf("Book", "Game", "Movie", "Vinyl", "CD", "Comic", "Coin", "Other").map { it to it }) { kind = it }
             OutlinedTextField(format, { format = it }, label = { Text("Format / edition") }, placeholder = { Text("Hardback, cartridge, first edition…") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing, apply = { suggestion, replace, downloadedCover ->
+                val next = draft.withSuggestion(suggestion, replace)
+                title = next.title; creator = next.creator; kind = next.kind; format = next.format
+                barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
+                metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
+                if (downloadedCover != null) photoName = downloadedCover
+            }, working = { assisting = it }, message = message)
             Text("On your shelf", style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ItemStatus.entries.forEach { value -> FilterChip(selected = status == value, onClick = { statusName = value.name }, label = { Text(value.label) }) }
             }
             if (status == ItemStatus.LENT) OutlinedTextField(lentTo, { lentTo = it }, label = { Text("Lent to *") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(barcode, { barcode = it }, label = { Text("Barcode / ISBN") }, supportingText = { Text("Scanning captures the code; metadata lookup is not connected yet.") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(barcode, { barcode = it }, label = { Text("Barcode / ISBN") }, supportingText = { Text("Use Find and fill details to look up a book or music barcode. Clear the barcode to search by title.") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(notes, { notes = it }, label = { Text("Notes / condition") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
         }
     }
@@ -155,6 +167,7 @@ internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edi
         Text(listOf(item.kind, item.format).filter { it.isNotBlank() }.joinToString(" · "), color = Muted)
         if (item.status == ItemStatus.LENT) Text("Lent to ${item.lentTo}")
         if (item.barcode.isNotBlank()) { HorizontalDivider(color = Line); Text("Barcode / ISBN", style = MaterialTheme.typography.labelLarge, color = Muted); Text(item.barcode) }
+        if (item.metadataSource.isNotBlank()) Text("Metadata: ${item.metadataSource}\n${item.metadataUrl}", style = MaterialTheme.typography.bodySmall, color = Muted)
         if (item.notes.isNotBlank()) { HorizontalDivider(color = Line); Text("Notes", style = MaterialTheme.typography.titleLarge); Text(item.notes) }
         Button(onClick = edit, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.Edit, null); Spacer(Modifier.width(8.dp)); Text("Edit item") }
         TextButton(onClick = { confirmDelete = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Delete item", color = MaterialTheme.colorScheme.error) }

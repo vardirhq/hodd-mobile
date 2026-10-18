@@ -11,13 +11,21 @@ A native Android home for the things you collect. Built with Kotlin and Jetpack 
 - Filter by owned, wanted, and lent out; see wanted items together in the wishlist.
 - Add, edit, and delete items, including edition, condition notes, borrower, and barcode.
 - Capture barcodes with the bundled scanner, enter them manually, take a cover photo, or choose one from your device.
+- Find book details by ISBN/title through Open Library, and CD/vinyl releases by barcode/title through MusicBrainz.
+- Review fetched details and optionally download artwork from Open Library or Cover Art Archive.
+- Read cover text offline using bundled ML Kit recognition; prefer Gemini Nano to structure that text when available.
+- Describe an item naturally to propose fields using on-device AI on supported devices.
 - Use every collection feature offline, without an account or server.
 
-Scanning captures a code. It does **not** automatically look up a title or artwork yet. Covers without photos are generated locally from the title and type. Example data is optional and uses fictional titles; your library starts empty.
+After scanning, open **Find and fill details → Find online** to look up the code. For a title search, clear the barcode and enter a title (and optionally creator). Select Book/Comic for Open Library or CD/Vinyl for MusicBrainz. Games and movies currently support local cover recognition and manual entry, not online metadata lookup.
+
+Suggestions are reviewed before they fill the form. Existing values and photos are preserved unless replacement is explicitly selected. Nothing is saved until you tap Save. Open Library returns work-level matches: check your physical edition and cover. Community catalogs have gaps, and music barcodes can identify multiple releases.
+
+Covers without photos are generated locally from the title and type. Example data is optional and uses fictional titles; your library starts empty.
 
 ## Build
 
-Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. The pinned toolchain follows the established Skald Mobile setup rather than using preview dependencies.
+Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Compose compiler 2.1.20, AGP 8.7.3 and Gradle 8.11.1 are pinned. The optional ML Kit Prompt integration is pinned to 1.0.0-alpha1; its availability and behavior depend on the device and AICore.
 
 ```sh
 ./gradlew :core:test :app:assembleDebug :app:lintDebug
@@ -42,11 +50,24 @@ Device/emulator checks:
 
 One immutable catalog is observed by every screen. Writes run on the IO dispatcher behind a mutex; the visible catalog updates only after the atomic file save succeeds. Invalid or unreadable data is preserved and blocks writes instead of silently resetting the collection.
 
-Photos are copied into app-private storage. Camera access is used only for capture/scanning. No account, analytics, desktop connection, or sync is required. Android cloud backup is disabled for this initial version; uninstalling the app removes its local data. Import/export and photo cleanup are still pending, so use this version for evaluation.
+Photos are copied into app-private storage. Camera access is used only for capture/scanning. No Hodd account, paid API key, hosted backend, desktop connection, or sync is required.
+
+## Local assistance and online metadata
+
+**Read cover** runs bundled Latin-script ML Kit OCR on the device, including offline. If Gemini Nano is ready, Hodd prefers it to structure the recognized text; if it fails or is unavailable, you can choose a recognized line as the title. Missing author/edition information is not inferred by the OCR fallback. **Suggest from description** requires an available local model. AI output is untrusted, bounded and validated, and always reviewed; it can still be wrong.
+
+Hodd checks Gemini Nano availability at runtime. AICore/device/model support varies, and Google Play/AICore initialization may be necessary. Where supported but not downloaded, **Set up local AI** offers an explicit model download. There is no cloud AI fallback, API key or AI subscription. Actual Nano generation still needs testing on supported physical hardware; emulator tests use a controlled model adapter to verify preference and failure handling.
+
+**Find online** sends only a barcode, or title and creator, to Open Library or MusicBrainz over HTTPS. Photos, notes and your catalog are not uploaded. Requests identify Hodd, are serialized at no more than one per 1.1 seconds, and successful results are cached for 24 hours (up to 100 queries). Artwork is downloaded only when you select it and then stored locally. Errors/no matches leave the draft intact and manual entry remains available. Metadata source and provider ID/link are stored with the item.
+
+Sources: [Open Library API](https://openlibrary.org/developers/api), [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive). Cover artwork remains subject to its respective rights. Bundled OCR and the AICore integration are Google ML Kit components and may perform SDK/service diagnostics independently of Hodd; consult [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
+
+## Data storage
+ Android cloud backup is disabled for this initial version; uninstalling the app removes its local data. Import/export and photo cleanup are still pending, so use this version for evaluation.
 
 ## Next steps
 
-- Metadata lookup and duplicate suggestions after scanning.
+- Additional metadata sources and duplicate suggestions after scanning.
 - Portable backup/export including photos; collection rename/delete and sorting.
 - Device testing of camera permission denial, large font sizes, rotation, and long collections.
 - Optional desktop interoperability and GESH sync after the standalone app is solid.

@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Keyless Open Library ISBN/title and MusicBrainz barcode/title searches, result caching and optional cover downloads.
+- Offline cover text recognition, with preferred on-device Gemini Nano structuring where supported.
+- Local AI description-to-fields, explicit model setup and review-before-apply without overwriting existing edits by default.
+- Metadata provenance and compatibility with older saved catalogs.
+- Provider parsing/identifier/merge tests and emulator coverage for caching, OCR, and local AI preference/fallback.
 - Native Android home, collections, wishlist, item details, and add/edit screens.
 - Offline collections with atomic local persistence and recoverable save errors.
 - Search, status filters, ownership counts, and lending details.
@@ -10,6 +15,7 @@
 - Optional example collection, local typographic covers, and empty states.
 
 ### Changed
+- Kotlin and Compose compiler pinned to 2.1.20 for the local assistance integration.
 
 ### Fixed
 - The barcode scanner follows the phone’s orientation instead of forcing landscape.
