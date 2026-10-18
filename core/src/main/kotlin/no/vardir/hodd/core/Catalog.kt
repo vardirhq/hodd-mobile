@@ -24,6 +24,9 @@ data class CatalogItem(
     val lentTo: String = "",
     val photoName: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
+    val metadataSource: String = "",
+    val metadataId: String = "",
+    val metadataUrl: String = "",
 )
 
 @Serializable
