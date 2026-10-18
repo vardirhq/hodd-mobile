@@ -50,6 +50,7 @@ internal fun ItemEditor(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val editorScroll = rememberScrollState()
     val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
     DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
     var fieldScan by remember { mutableStateOf<String?>(null) }
@@ -176,7 +177,7 @@ internal fun ItemEditor(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(editorScroll).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
             Text("Read a cover, identify an item, or add details yourself. Your collection is stored on this device.", color = Muted)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

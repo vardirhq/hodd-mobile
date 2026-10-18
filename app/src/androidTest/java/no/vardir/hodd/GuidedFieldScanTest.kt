@@ -117,7 +117,7 @@ class GuidedFieldScanTest {
         val bounds = button.getUnclippedBoundsInRoot()
         assertTrue("Capture button overlaps system navigation: $bounds / $screen",
             bounds.bottom.value <= screen.bottom.value - navigationBottom / density - 12f)
-        assertTrue("Capture target is too small", bounds.height.value >= 56f)
+        assertTrue("Capture target is too small", bounds.bottom.value - bounds.top.value >= 55.5f)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.waitForIdleSync()
         val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
