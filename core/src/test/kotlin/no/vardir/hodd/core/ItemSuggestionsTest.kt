@@ -68,6 +68,21 @@ class ItemSuggestionsTest {
         assertEquals(123L, result.addedAt)
     }
 
+    @Test fun expandedMetadataSurvivesRoundTripAndMergesSafely() {
+        val old = CatalogCodec.decode("""{"version":1,"collections":[{"id":"s","name":"Shelf"}],"items":[{"id":"i","collectionId":"s","title":"Example"}]}""")
+        assertEquals("", old.items.single().subtitle)
+        val enriched = old.items.single().copy(series = "Series A", attributes = mapOf("platform" to "PC"))
+        val saved = CatalogCodec.decode(CatalogCodec.encode(old.copy(items = listOf(enriched))))
+        assertEquals("Series A", saved.items.single().series)
+        assertEquals("PC", saved.items.single().attributes["platform"])
+        val suggestion = SuggestionCodec.fromLocalAi("""{"title":"Example","subtitle":"A subtitle","series":"Series B","publisher":"Publisher"}""", "Book")
+        val merged = saved.items.single().withSuggestion(suggestion)
+        assertEquals("Series A", merged.series)
+        assertEquals("A subtitle", merged.subtitle)
+        assertEquals("Publisher", merged.publisher)
+        assertEquals("Series B", merged.withSuggestion(suggestion, replace = true).series)
+    }
+
     @Test fun oldSavedCatalogsRemainReadableWithNewSourceFields() {
         val catalog = CatalogCodec.decode("""{"version":1,"collections":[{"id":"a","name":"Shelf"}],"items":[{"id":"b","collectionId":"a","title":"Book"}]}""")
         assertEquals("", catalog.items.single().metadataId)
