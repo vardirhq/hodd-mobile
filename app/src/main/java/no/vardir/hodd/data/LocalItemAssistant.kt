@@ -2,6 +2,7 @@ package no.vardir.hodd.data
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
@@ -32,6 +33,7 @@ interface LocalTextModel : AutoCloseable {
 }
 
 class NanoTextModel : LocalTextModel {
+    companion object { private const val TAG = "HoddLocalAI" }
     private var model: GenerativeModel? = null
     private fun client(): GenerativeModel = model ?: Generation.getClient().also { model = it }
 
@@ -78,7 +80,12 @@ class NanoTextModel : LocalTextModel {
                 maxOutputTokens = 512
             })
         } ?: error("Local AI took too long. Try a shorter description or use the form.")
-        return SuggestionCodec.fromLocalAi(response.candidates.firstOrNull()?.text.orEmpty(), kind)
+        val raw = response.candidates.firstOrNull()?.text.orEmpty()
+        return try { SuggestionCodec.fromLocalAi(raw, kind) }
+        catch (error: Exception) {
+            Log.e(TAG, "Local AI returned an invalid suggestion (length=${raw.length})", error)
+            throw IllegalStateException("Local AI returned an unusable response", error)
+        }
             .let { if (description) it else it.copy(status = "", lentTo = "", notes = "") }
     }
 
@@ -111,7 +118,12 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
                 return LocalSuggestions(listOf(suggestion), "Suggested by local AI using text read from your cover. Check each field before applying.")
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
-                notice = "Local AI could not finish. The cover text was still read on-device; choose a title below."
+                Log.e("HoddLocalAI", "Cover suggestion failed: ${error.javaClass.simpleName}: ${error.message}", error)
+                notice = when {
+                    error.message?.contains("too long", ignoreCase = true) == true -> "Local AI timed out. Cover text was read on-device; choose a title below."
+                    error.message?.contains("unusable response", ignoreCase = true) == true -> "Local AI returned an unusable response. Cover text was read on-device; choose a title below."
+                    else -> "Local AI could not finish (${error.javaClass.simpleName}). Cover text was read on-device; choose a title below."
+                }
             }
         }
         val suggestions = lines.sortedByDescending { it.boundingBox?.height() ?: 0 }
