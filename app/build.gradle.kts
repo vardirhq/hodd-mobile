@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "no.vardir.hodd"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
     defaultConfig {
         applicationId = "no.vardir.hodd"
         minSdk = 26
