@@ -4,6 +4,14 @@ Android accepts an in-place update only when its package ID and signing certific
 
 Earlier CI builds used newly generated debug keys. An APK contains only the public certificate, so its original private key cannot be recovered from the download. A new permanent key cannot directly update an installation signed by a lost debug key. **Do not uninstall your existing copy before backing up its data.** Its debug build permits a USB/ADB backup; a migration or export must be completed before switching certificates.
 
+## Permanent signing certificate
+
+Configured on 19 October 2026. The public certificate is [signing-certificate.pem](signing-certificate.pem); no private key is stored in this repository. CI checks permanently signed APKs against this certificate before publishing the install artifact.
+
+SHA-256: `2C7401C1C05586912A38E3162EBA7BB5B4946DD3808C04A41A070D0966C7EE3A`.
+
+The private key and credentials have a separate private backup. Do not create a new key when building on another computer; restore that backup.
+
 ## One-time setup
 
 Install JDK 17, Python 3 and GitHub CLI. Authenticate with `gh auth login` using an account allowed to manage this repository's Actions secrets, then run from the repository:
