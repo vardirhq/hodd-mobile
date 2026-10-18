@@ -28,6 +28,8 @@ import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.Collection
 import no.vardir.hodd.core.ItemStatus
 import no.vardir.hodd.core.withSuggestion
+import no.vardir.hodd.data.LocalItemAssistant
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
 
@@ -39,6 +41,12 @@ internal fun ItemEditor(
     save: (CatalogItem) -> Unit, cancel: () -> Unit, message: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
+    DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
+    var fieldScan by remember { mutableStateOf<String?>(null) }
+    var scanResults by remember { mutableStateOf(emptyList<String>()) }
+    var lastScanField by remember { mutableStateOf("Publisher") }
     val draftId = rememberSaveable(existing?.id) { existing?.id ?: UUID.randomUUID().toString() }
     val addedAt = rememberSaveable(draftId) { existing?.addedAt ?: System.currentTimeMillis() }
     var title by rememberSaveable(draftId) { mutableStateOf(existing?.title.orEmpty()) }
@@ -98,6 +106,26 @@ internal fun ItemEditor(
         if (granted) takePhoto()
         else message("Camera access was not granted. You can choose an existing photo instead.")
     }
+    fun setScannedValue(field: String, value: String) {
+        when (field) {
+            "Title" -> title = value
+            "Creator" -> creator = value
+            "Format" -> format = value
+            "Subtitle" -> subtitle = value
+            "Series" -> series = value
+            "Volume" -> volume = value
+            "Publisher" -> publisher = value
+            "Language" -> language = value
+            "Release year" -> releaseYear = value
+            else -> attributes = attributes + (field to value)
+        }
+    }
+    @Composable
+    fun scanAction(field: String) {
+        IconButton(onClick = { fieldScan = field }, enabled = !busy && !assisting) {
+            Icon(Icons.Outlined.DocumentScanner, "Scan " + field)
+        }
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
@@ -125,18 +153,36 @@ internal fun ItemEditor(
                     if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy) { Text("Remove photo") }
                 }
             }
-            OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Title")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Creator")
+            }
             ChoiceMenu("Collection", collections.find { it.id == selectedCollection }?.name.orEmpty(), collections.map { it.id to it.name }) { selectedCollection = it }
             ChoiceMenu("Type", kind, listOf("Book", "Game", "Movie", "Vinyl", "CD", "Comic", "Coin", "Other").map { it to it }) { kind = it }
             OutlinedTextField(format, { format = it }, label = { Text("Format / edition") }, placeholder = { Text("Hardback, cartridge, first edition…") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Text("Additional details", style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(subtitle, { subtitle = it }, label = { Text("Subtitle") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(series, { series = it }, label = { Text("Series") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(volume, { volume = it }, label = { Text("Volume / number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(publisher, { publisher = it }, label = { Text("Publisher / label") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(series, { series = it }, label = { Text("Series") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Series")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(volume, { volume = it }, label = { Text("Volume / number") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Volume")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(publisher, { publisher = it }, label = { Text("Publisher / label") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Publisher")
+            }
             OutlinedTextField(language, { language = it }, label = { Text("Language") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                scanAction("Release year")
+            }
             OutlinedTextField(condition, { condition = it }, label = { Text("Condition") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             val categoryFields = when (kind) {
                 "Book", "Comic" -> listOf("isbn" to "ISBN", "pages" to "Page count", "binding" to "Binding")
@@ -177,6 +223,37 @@ subtitle = next.subtitle; series = next.series; volume = next.volume; publisher 
             OutlinedTextField(notes, { notes = it }, label = { Text("Notes / condition") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
         }
     }
+    fieldScan?.let { field ->
+        val file = remember(field) { File(context.cacheDir, "field-ocr-" + UUID.randomUUID() + ".jpg") }
+        androidx.compose.ui.window.Dialog(onDismissRequest = { if (!assisting) fieldScan = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            GuidedFieldCamera(field, file, onCaptured = { captured ->
+                assisting = true
+                scope.launch {
+                    try {
+                        scanResults = fieldAssistant.readFieldStrip(captured)
+                        if (scanResults.isEmpty()) message("No text found inside the highlighted strip.")
+                    } catch (_: Exception) { message("Text recognition failed. Try again.") }
+                    finally { captured.delete(); assisting = false; fieldScan = null }
+                }
+            }, onCancel = { fieldScan = null; file.delete() }, onError = { message(it); fieldScan = null; file.delete() })
+        }
+    }
+    if (scanResults.isNotEmpty()) AlertDialog(
+        onDismissRequest = { scanResults = emptyList() },
+        title = { Text("Choose recognized text") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                scanResults.forEach { candidate ->
+                    TextButton(onClick = {
+                        setScannedValue(lastScanField, candidate)
+                        scanResults = emptyList()
+                    }) { Text(candidate) }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { scanResults = emptyList() }) { Text("Cancel") } }
+    )
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = cancel) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
 }
 
