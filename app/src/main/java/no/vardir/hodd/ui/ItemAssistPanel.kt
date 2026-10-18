@@ -92,6 +92,34 @@ internal fun ItemAssistPanel(
                 }, enabled = enabled && !running && cover != null, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.DocumentScanner, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Read cover")
                 }
+                if (cover != null && draft.kind in listOf("Book", "Comic", "Vinyl", "CD")) {
+                    OutlinedButton(onClick = {
+                        task("Identifying cover and finding catalog matches…") {
+                            val recognized = local.readCover(cover, draft.kind)
+                            val identity = recognized.items.firstOrNull()
+                            if (identity == null) {
+                                notice = recognized.notice; suggestions = recognized.items
+                            } else {
+                                val matches = try {
+                                    metadata.lookup(draft.kind, "", identity.title, identity.creator)
+                                } catch (error: Exception) {
+                                    if (error is CancellationException) throw error
+                                    emptyList()
+                                }
+                                suggestions = if (matches.isEmpty()) recognized.items else matches
+                                notice = if (matches.isEmpty())
+                                    "No catalog match found. Review the on-device identification instead."
+                                else "Catalog matches based on the cover title and creator. Check the edition before applying."
+                            }
+                            status = local.status()
+                        }
+                    }, enabled = enabled && !running, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Identify and find online")
+                    }
+                    Text("Sends the recognized title and creator to the metadata provider, never your photo.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                }
                 if (cover == null) Text("Take or choose a cover photo above to read its text.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 OutlinedTextField(description, { description = it.take(3000) }, label = { Text("Describe your item") },
                     placeholder = { Text("The Hobbit paperback, lent to Martin") }, enabled = enabled && !running,
@@ -104,7 +132,7 @@ internal fun ItemAssistPanel(
                 }, enabled = enabled && !running && status == LocalAiStatus.AVAILABLE && description.isNotBlank()) { Text("Suggest from description") }
                 HorizontalDivider(color = Line)
                 Text("Free online lookup", style = MaterialTheme.typography.titleSmall)
-                Text("Books: Open Library. CDs/vinyl: MusicBrainz; artwork: Cover Art Archive. Find online sends only the barcode, or title and creator, to the selected provider. Photos and notes stay on-device.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                Text("Books: Open Library. CDs/vinyl: MusicBrainz; artwork: Cover Art Archive. Online search prioritizes title and creator; barcode is a fallback. Only search terms are sent to the provider. Photos and notes stay on-device.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 Button(onClick = {
                     task("Finding matching items…") {
                         val matches = metadata.lookup(draft.kind, draft.barcode, draft.title, draft.creator)
