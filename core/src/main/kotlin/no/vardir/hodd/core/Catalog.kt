@@ -64,7 +64,7 @@ data class Catalog(val version: Int = 1, val collections: List<Collection> = emp
 data class Counts(val owned: Int, val wanted: Int, val lent: Int)
 
 object CatalogCodec {
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
     fun encode(catalog: Catalog): String = json.encodeToString(Catalog.serializer(), catalog)
     fun decode(text: String): Catalog {
         val catalog = json.decodeFromString(Catalog.serializer(), text)

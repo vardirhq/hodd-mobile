@@ -54,6 +54,15 @@ class CatalogTest {
         val catalog = empty.save(item().copy(photoName = "cover-123.jpg", notes = "Ønskeliste\nA quote: \"yes\""))
         assertEquals(catalog, CatalogCodec.decode(CatalogCodec.encode(catalog)))
     }
+    @Test fun `snapshots explicitly store defaults so restore cannot regenerate timestamps`() {
+        val original = empty.save(item())
+        val encoded = CatalogCodec.encode(original)
+        assertContains(encoded, "\"addedAt\"")
+        assertContains(encoded, "\"notes\"")
+        assertContains(encoded, "\"status\"")
+        assertContains(encoded, "\"version\"")
+        assertEquals(original, CatalogCodec.decode(encoded))
+    }
     @Test fun `unsupported versions and unsafe photo paths fail without returning an empty catalog`() {
         assertFailsWith<IllegalArgumentException> { CatalogCodec.decode("{\"version\":2}") }
         assertFails { CatalogCodec.decode("not json") }
