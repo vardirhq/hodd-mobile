@@ -30,14 +30,14 @@ class MetadataRepository(private val context: Context, private val transport: ((
         val music = kind in listOf("Vinyl", "CD", "Music")
         require(music || kind in listOf("Book", "Comic")) { "Online lookup currently supports books and music. Use a cover photo or enter details for this type." }
         require(code.isNotBlank() || title.isNotBlank()) { "Scan a barcode or enter a title to search." }
-        if (code.isNotBlank()) require(if (music) isGtin(code) else isIsbn(code)) { "${if (music) "Barcode" else "ISBN"} check digit is invalid. Check the code or clear it to search by title." }
+        if (code.isNotBlank() && title.isBlank()) require(if (music) isGtin(code) else isIsbn(code)) { "${if (music) "Barcode" else "ISBN"} check digit is invalid. Check the code or clear it to search by title." }
         fun encode(value: String) = URLEncoder.encode(value, "UTF-8")
         fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").take(300) + "\""
         val url = if (music) {
-            val query = if (code.isNotBlank()) "barcode:${quoted(code)}" else "release:${quoted(title)}" + if (creator.isNotBlank()) " AND artist:${quoted(creator)}" else ""
+            val query = if (title.isBlank()) "barcode:${quoted(code)}" else "release:${quoted(title)}" + if (creator.isNotBlank()) " AND artist:${quoted(creator)}" else ""
             "https://musicbrainz.org/ws/2/release/?query=${encode(query)}&fmt=json&limit=8"
         } else {
-            val query = if (code.isNotBlank()) "isbn=${encode(code)}" else "q=${encode(listOf(title, creator).filter(String::isNotBlank).joinToString(" ").take(500))}"
+            val query = if (title.isBlank()) "isbn=${encode(code)}" else "q=${encode(listOf(title, creator).filter(String::isNotBlank).joinToString(" ").take(500))}"
             "https://openlibrary.org/search.json?$query&fields=key,title,author_name,cover_i,first_publish_year&limit=8"
         }
         val cacheDir = File(context.cacheDir, "metadata").apply { mkdirs() }
@@ -51,7 +51,7 @@ class MetadataRepository(private val context: Context, private val transport: ((
             if (elapsed < 1100) delay(1100 - elapsed)
             lastRequest = android.os.SystemClock.elapsedRealtime()
             val body = readUrl(url, 1024 * 1024).toString(Charsets.UTF_8)
-            val results = if (music) MetadataParser.music(body, kind) else MetadataParser.books(body, code).map { it.copy(kind = kind) }
+            val results = if (music) MetadataParser.music(body, kind) else MetadataParser.books(body, if (title.isBlank()) code else "").map { it.copy(kind = kind) }
             // A cache failure must not discard a successful lookup.
             try {
                 cache.writeText(SuggestionCodec.encode(results))
