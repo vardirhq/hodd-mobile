@@ -15,6 +15,8 @@
 - Optional example collection, local typographic covers, and empty states.
 
 ### Changed
+- Item details now use a cover-led header, dedicated lending/wishlist cards, grouped metadata, and persistent edit/delete controls.
+- Light app screens use dark system-bar icons; the camera temporarily switches to light icons for contrast.
 - Kotlin and Compose compiler pinned to 2.1.20 for the local assistance integration.
 
 ### Fixed

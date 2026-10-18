@@ -37,6 +37,7 @@ internal fun GuidedFieldCamera(
     onCancel: () -> Unit,
     onError: (String) -> Unit,
 ) {
+    CameraSystemBars()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val capturedCallback by rememberUpdatedState(onCaptured)

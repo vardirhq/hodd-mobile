@@ -300,25 +300,3 @@ private fun ChoiceMenu(label: String, selected: String, choices: List<Pair<Strin
         DropdownMenu(expanded, { expanded = false }) { choices.forEach { (id, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { choose(id); expanded = false }) } }
     }
 }
-
-@Composable
-internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edit: () -> Unit, delete: () -> Unit, busy: Boolean) {
-    var confirmDelete by rememberSaveable(item.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Cover(item, photo, Modifier.width(190.dp).height(260.dp)) }
-        Text(item.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.testTag("item-title"))
-        if (item.creator.isNotBlank()) Text(item.creator, style = MaterialTheme.typography.titleMedium, color = Muted)
-        StatusPill(item.status)
-        Text(collection, color = Violet)
-        Text(listOf(item.kind, item.format).filter { it.isNotBlank() }.joinToString(" · "), color = Muted)
-        if (item.status == ItemStatus.LENT) Text("Lent to ${item.lentTo}")
-        if (item.barcode.isNotBlank()) { HorizontalDivider(color = Line); Text("Barcode / ISBN", style = MaterialTheme.typography.labelLarge, color = Muted); Text(item.barcode) }
-        listOf("Subtitle" to item.subtitle, "Series" to item.series, "Volume" to item.volume, "Publisher" to item.publisher, "Language" to item.language, "Release year" to item.releaseYear, "Condition" to item.condition).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
-        item.attributes.toSortedMap().forEach { (key, value) -> if (value.isNotBlank()) Text("${key.replaceFirstChar { it.uppercase() }}: $value") }
-        if (item.metadataSource.isNotBlank()) Text("Metadata: ${item.metadataSource}\n${item.metadataUrl}", style = MaterialTheme.typography.bodySmall, color = Muted)
-        if (item.notes.isNotBlank()) { HorizontalDivider(color = Line); Text("Notes", style = MaterialTheme.typography.titleLarge); Text(item.notes) }
-        Button(onClick = edit, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.Edit, null); Spacer(Modifier.width(8.dp)); Text("Edit item") }
-        TextButton(onClick = { confirmDelete = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Delete item", color = MaterialTheme.colorScheme.error) }
-    }
-    if (confirmDelete) AlertDialog(onDismissRequest = { if (!busy) confirmDelete = false }, title = { Text("Delete ${item.title}?") }, text = { Text("This removes the item from your collection. This cannot be undone.") }, confirmButton = { TextButton(onClick = delete, enabled = !busy) { Text("Delete") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }, enabled = !busy) { Text("Keep item") } })
-}
