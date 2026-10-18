@@ -89,7 +89,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
         topBar = {
             if (!editor) TopAppBar(
                 title = { Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Shelves, null, tint = Violet, modifier = Modifier.size(28.dp))
+                    Icon(ShelfIcon, null, tint = Violet, modifier = Modifier.size(28.dp))
                     Spacer(Modifier.width(8.dp)); Text("HODD", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                 } },
                 navigationIcon = { if (page == "detail" || page == "collection") IconButton(onClick = { back() }) { Icon(Icons.Outlined.ArrowBack, "Back") } },
@@ -129,7 +129,7 @@ private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Uni
         item { Text("Your collection,\nwithin reach.", style = MaterialTheme.typography.headlineLarge) }
         item { SearchField(query, onQuery) }
         if (catalog.collections.isEmpty()) {
-            item { EmptyState(Icons.Outlined.Shelves, "A home for what you love", "Books, games, records, and the things that are uniquely yours. Create a collection to get started.", "Create a collection", create) }
+            item { EmptyState(ShelfIcon, "A home for what you love", "Books, games, records, and the things that are uniquely yours. Create a collection to get started.", "Create a collection", create) }
             item { TextButton(onClick = examples) { Text("Explore with an example collection") } }
         } else if (query.isNotBlank()) {
             val results = catalog.search(query)
@@ -177,7 +177,7 @@ private fun CollectionsScreen(catalog: Catalog, open: (Collection) -> Unit, crea
             OutlinedCard(onClick = { open(collection) }, colors = CardDefaults.outlinedCardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Shelves, null, tint = Violet)
+                        Icon(ShelfIcon, null, tint = Violet)
                         Spacer(Modifier.width(12.dp)); Text(collection.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f)); Icon(Icons.Outlined.ChevronRight, "Open")
                     }
                     Spacer(Modifier.height(12.dp))
@@ -246,7 +246,7 @@ private fun Shelf(items: List<CatalogItem>, photo: (String?) -> File?) {
     Box(Modifier.fillMaxWidth().height(235.dp).background(Brush.verticalGradient(listOf(Color(0xFFF0E8DA), Color(0xFFE6D6BD))), RoundedCornerShape(20.dp)), contentAlignment = Alignment.BottomCenter) {
         Row(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 27.dp).fillMaxWidth().height(180.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Bottom) {
             items.forEach { item -> Cover(item, photo(item.photoName), Modifier.weight(1f).fillMaxHeight()) }
-            if (items.isEmpty()) Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) { Icon(Icons.Outlined.Shelves, null, tint = Color(0xFF9A896F), modifier = Modifier.size(48.dp)); Text("Room for your first find", color = Muted) }
+            if (items.isEmpty()) Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) { Icon(ShelfIcon, null, tint = Color(0xFF9A896F), modifier = Modifier.size(48.dp)); Text("Room for your first find", color = Muted) }
         }
         Box(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 10.dp).background(Color(0xFFC8A67B), RoundedCornerShape(4.dp)))
     }
