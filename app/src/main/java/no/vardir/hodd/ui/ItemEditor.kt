@@ -64,10 +64,11 @@ internal fun ItemEditor(
     var language by rememberSaveable(draftId) { mutableStateOf(existing?.language.orEmpty()) }
     var releaseYear by rememberSaveable(draftId) { mutableStateOf(existing?.releaseYear.orEmpty()) }
     var condition by rememberSaveable(draftId) { mutableStateOf(existing?.condition.orEmpty()) }
+    var attributes by remember(draftId) { mutableStateOf(existing?.attributes.orEmpty()) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val status = ItemStatus.valueOf(statusName)
-    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, existing?.attributes.orEmpty())
-    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank()
+    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes)
+    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
     fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else cancel() } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -141,11 +142,25 @@ internal fun ItemEditor(
             OutlinedTextField(language, { language = it }, label = { Text("Language") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(condition, { condition = it }, label = { Text("Condition") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            val categoryFields = when (kind) {
+                "Book", "Comic" -> listOf("isbn" to "ISBN", "pages" to "Page count", "binding" to "Binding")
+                "Game" -> listOf("platform" to "Platform", "developer" to "Developer", "region" to "Region", "edition" to "Edition")
+                "Movie" -> listOf("director" to "Director", "runtime" to "Runtime", "region" to "Region", "resolution" to "Resolution")
+                "Vinyl", "CD" -> listOf("label" to "Record label", "catalogNumber" to "Catalog number", "tracks" to "Track count")
+                "Coin" -> listOf("country" to "Country", "denomination" to "Denomination", "mintYear" to "Mint year", "mintMark" to "Mint mark", "material" to "Material")
+                else -> emptyList()
+            }
+            if (categoryFields.isNotEmpty()) Text("$kind details", style = MaterialTheme.typography.titleLarge)
+            categoryFields.forEach { (key, label) ->
+                OutlinedTextField(attributes[key].orEmpty(), { value ->
+                    attributes = attributes.toMutableMap().apply { if (value.isBlank()) remove(key) else put(key, value.take(300)) }
+                }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            }
             ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing, apply = { suggestion, replace, downloadedCover ->
                 val next = draft.withSuggestion(suggestion, replace)
                 title = next.title; creator = next.creator; kind = next.kind; format = next.format
                 barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
-subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition;
+subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
                 metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
                 if (downloadedCover != null) photoName = downloadedCover
             }, working = { assisting = it }, message = message)
@@ -184,6 +199,7 @@ internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edi
         if (item.status == ItemStatus.LENT) Text("Lent to ${item.lentTo}")
         if (item.barcode.isNotBlank()) { HorizontalDivider(color = Line); Text("Barcode / ISBN", style = MaterialTheme.typography.labelLarge, color = Muted); Text(item.barcode) }
         listOf("Subtitle" to item.subtitle, "Series" to item.series, "Volume" to item.volume, "Publisher" to item.publisher, "Language" to item.language, "Release year" to item.releaseYear, "Condition" to item.condition).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
+        item.attributes.toSortedMap().forEach { (key, value) -> if (value.isNotBlank()) Text("${key.replaceFirstChar { it.uppercase() }}: $value") }
         if (item.metadataSource.isNotBlank()) Text("Metadata: ${item.metadataSource}\n${item.metadataUrl}", style = MaterialTheme.typography.bodySmall, color = Muted)
         if (item.notes.isNotBlank()) { HorizontalDivider(color = Line); Text("Notes", style = MaterialTheme.typography.titleLarge); Text(item.notes) }
         Button(onClick = edit, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(Icons.Outlined.Edit, null); Spacer(Modifier.width(8.dp)); Text("Edit item") }
