@@ -32,7 +32,7 @@ class AboutVersionTest {
         compose.onNodeWithText("${BuildConfig.VERSION_NAME} - ", substring = true).assertIsDisplayed()
         val directory = File(compose.activity.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(directory, "11-about-changelog.png").outputStream().use {
-            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+            compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         compose.onNodeWithText("Close").performClick()
         compose.onNodeWithContentDescription("About Hodd").assertIsDisplayed()
