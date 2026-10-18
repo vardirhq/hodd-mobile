@@ -9,3 +9,6 @@ local.properties
 .DS_Store
 
 credentials.json
+
+dist/
+__pycache__/

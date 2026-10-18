@@ -23,6 +23,10 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Validate version and changelog
+        run: |
+          python3 scripts/release_metadata.py
+          python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Restore persistent signing key
         id: signing
         env:
@@ -57,6 +61,7 @@ jobs:
             expected=$(openssl x509 -in docs/signing-certificate.pem -outform DER | sha256sum | cut -d ' ' -f 1)
             grep -F "Signer #1 certificate SHA-256 digest: $expected" "$RUNNER_TEMP/hodd-signature.txt"
           fi
+          python3 scripts/release_metadata.py --apk app/build/outputs/apk/release/app-release.apk --build "$HODD_VERSION_CODE" --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         with:
           name: hodd-mobile-test-apks
@@ -68,7 +73,7 @@ jobs:
         if: steps.signing.outputs.ready == 'true'
         with:
           name: hodd-mobile-install
-          path: app/build/outputs/apk/release/app-release.apk
+          path: dist/*
       - name: Remove private signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/hodd-signing.jks"
@@ -113,7 +118,7 @@ jobs:
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb install -r built-apks/debug/app-debug.apk
             adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -e timeout_msec 120000 no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (16 tests)' device-tests.txt
+            adb shell am instrument -w -e timeout_msec 120000 no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (17 tests)' device-tests.txt
             bash scripts/check-apk-update.sh built-apks/debug/app-debug.apk built-apks/release/app-release.apk
       - uses: actions/upload-artifact@v4
         if: always()

@@ -2,7 +2,7 @@
 
 A native Android home for the things you collect. Built with Kotlin and Jetpack Compose, inspired by [Hodd for desktop](https://github.com/vardirhq/hodd).
 
-**Early development · 0.1.0** — the initial offline collection flows are implemented. This is not a production release.
+**Early development · 0.1.0-alpha.1** — the initial offline collection flows are implemented. This is not a production release.
 
 ## What you can do
 
@@ -40,6 +40,10 @@ Device/emulator checks:
 ```sh
 ./gradlew :app:connectedDebugAndroidTest
 ```
+
+## Versions and changelog
+
+[VERSION](VERSION) is the shared app version. CI assigns an increasing Android build number independently. About Hodd shows both and includes the full changelog offline. Install artifacts contain a named APK, SHA-256 checksum, exact commit/build metadata and release notes. See [CHANGELOG.md](CHANGELOG.md) for changes and [release procedure](docs/RELEASING.md) for version bumps and tagged releases.
 
 ## Structure
 

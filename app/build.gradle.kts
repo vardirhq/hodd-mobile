@@ -3,7 +3,9 @@ plugins {
     kotlin("android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val hoddVersionName = rootProject.file("VERSION").readText().trim()
 val hoddVersionCode = providers.environmentVariable("HODD_VERSION_CODE").orElse("1").get().toInt()
+require(hoddVersionCode in 1..2_100_000_000) { "HODD_VERSION_CODE must be a positive Android build number." }
 val hoddSigningPath = providers.environmentVariable("HODD_KEYSTORE_PATH").orNull
 val hoddSigningPassword = providers.environmentVariable("HODD_KEYSTORE_PASSWORD").orNull
 val hoddSigningAlias = providers.environmentVariable("HODD_KEY_ALIAS").orNull
@@ -21,7 +23,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = hoddVersionCode
-        versionName = "0.1.0"
+        versionName = hoddVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -38,7 +40,8 @@ android {
             getByName("release").signingConfig = signingConfigs.getByName("persistent")
         }
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/changelog-assets"))
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -46,6 +49,11 @@ android {
     kotlinOptions { jvmTarget = "17" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
+val generateChangelogAssets by tasks.registering(Copy::class) {
+    from(rootProject.file("CHANGELOG.md"))
+    into(layout.buildDirectory.dir("generated/changelog-assets"))
+}
+tasks.named("preBuild").configure { dependsOn(generateChangelogAssets) }
 tasks.configureEach {
     if (name == "preReleaseBuild") doFirst {
         check(hoddSigningReady) { "Release APKs require the persistent Hodd signing key. See docs/SIGNING.md." }

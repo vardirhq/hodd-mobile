@@ -1,8 +1,15 @@
 # Changelog
 
+Notable changes are grouped by version. Work in progress goes under Unreleased; dated entries describe named alpha builds.
+
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-10-19
+
 ### Added
+- Version and build information plus an offline changelog in About Hodd.
+- A shared VERSION file, release metadata, checksums, and APK filenames identifying their version/build.
+- One-time signing setup and emulator checks that app replacement preserves catalog and photo data.
 - Keyless Open Library ISBN/title and MusicBrainz barcode/title searches, result caching and optional cover downloads.
 - Offline cover text recognition, with preferred on-device Gemini Nano structuring where supported.
 - Local AI description-to-fields, explicit model setup and review-before-apply without overwriting existing edits by default.
@@ -26,6 +33,7 @@
 - Camera binding waits for preview layout and releases only its own use cases when closed.
 - The barcode scanner follows the phone’s orientation instead of forcing landscape.
 
-### APK signing and updates
-- Added private-key signing configuration, increasing CI version codes, a one-time secret setup helper, and a dedicated install artifact.
-- Added emulator replacement checks for catalog and photo preservation; test-only builds are labeled separately when signing is not configured.
+### Security
+- APKs use a permanent private signing key, with CI verification against the pinned public certificate.
+- Test-only APKs are labeled separately from installable builds.
+- The first transition from earlier temporary debug keys requires a data backup before switching certificates.

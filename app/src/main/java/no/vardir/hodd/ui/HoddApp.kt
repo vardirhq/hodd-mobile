@@ -47,6 +47,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
     var collectionReturn by rememberSaveable { mutableStateOf("home") }
     var query by rememberSaveable { mutableStateOf("") }
     var newCollection by rememberSaveable { mutableStateOf(false) }
+    var aboutOpen by rememberSaveable { mutableStateOf(false) }
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val collection = catalog.collections.find { it.id == collectionId }
@@ -94,6 +95,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                 } },
                 navigationIcon = { if (page == "detail" || page == "collection") IconButton(onClick = { back() }) { Icon(Icons.Outlined.ArrowBack, "Back") } },
                 actions = {
+                    IconButton(onClick = { aboutOpen = true }) { Icon(Icons.Outlined.Info, "About Hodd") }
                     if (page != "detail") {
                         TextButton(onClick = { addItem() }) { Text("Add item") }
                         IconButton(onClick = { newCollection = true }) { Icon(Icons.Outlined.CreateNewFolder, "New collection") }
@@ -123,6 +125,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
         }
     }
     if (newCollection) NewCollectionDialog(busy, catalog.collections.map { it.name }, { newCollection = false }) { name -> vm.addCollection(name) { newCollection = false; collectionReturn = page; collectionId = vm.catalog.value.collections.last().id; page = "collection"; query = "" } }
+    if (aboutOpen) AboutHodd { aboutOpen = false }
 }
 
 @Composable
