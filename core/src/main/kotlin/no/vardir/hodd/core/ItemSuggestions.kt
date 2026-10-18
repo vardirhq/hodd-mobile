@@ -19,6 +19,14 @@ data class ItemSuggestion(
     val sourceUrl: String = "",
     val coverUrl: String = "",
     val detail: String = "",
+    val subtitle: String = "",
+    val series: String = "",
+    val volume: String = "",
+    val publisher: String = "",
+    val language: String = "",
+    val releaseYear: String = "",
+    val condition: String = "",
+    val attributes: Map<String, String> = emptyMap(),
 )
 
 /** Keeps leading zeroes; never interprets a product identifier as a number. */
@@ -59,7 +67,9 @@ object SuggestionCodec {
         require(barcode.isEmpty() || isIsbn(barcode) || isGtin(barcode)) { "The suggested barcode was invalid. Enter it manually." }
         val borrower = field("lentTo")
         val status = field("status").takeIf { it in listOf("OWNED", "WANTED", "LENT") && (it != "LENT" || borrower.isNotBlank()) }.orEmpty()
-        return ItemSuggestion(title, field("creator"), kind, field("format"), barcode, field("notes", 2000), status, borrower, source = "On-device AI")
+        return ItemSuggestion(title, field("creator"), kind, field("format"), barcode, field("notes", 2000), status, borrower, source = "On-device AI",
+            subtitle = field("subtitle"), series = field("series"), volume = field("volume"), publisher = field("publisher"),
+            language = field("language"), releaseYear = field("releaseYear"), condition = field("condition"))
     }
 }
 
@@ -75,6 +85,11 @@ fun CatalogItem.withSuggestion(suggestion: ItemSuggestion, replace: Boolean = fa
         notes = merge(notes, suggestion.notes),
         status = if (nextStatus == ItemStatus.LENT && borrower.isBlank()) status else nextStatus,
         lentTo = borrower,
+        subtitle = merge(subtitle, suggestion.subtitle), series = merge(series, suggestion.series),
+        volume = merge(volume, suggestion.volume), publisher = merge(publisher, suggestion.publisher),
+        language = merge(language, suggestion.language), releaseYear = merge(releaseYear, suggestion.releaseYear),
+        condition = merge(condition, suggestion.condition),
+        attributes = attributes.toMutableMap().apply { suggestion.attributes.forEach { (key, value) -> if (value.isNotBlank() && (replace || this[key].isNullOrBlank())) this[key] = value } },
         metadataSource = suggestion.source.takeIf { it in listOf("Open Library", "MusicBrainz") } ?: metadataSource,
         metadataId = suggestion.sourceId.ifBlank { metadataId }, metadataUrl = suggestion.sourceUrl.ifBlank { metadataUrl },
     )
