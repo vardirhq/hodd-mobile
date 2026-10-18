@@ -93,7 +93,12 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                     Spacer(Modifier.width(8.dp)); Text("HODD", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                 } },
                 navigationIcon = { if (page == "detail" || page == "collection") IconButton(onClick = { back() }) { Icon(Icons.Outlined.ArrowBack, "Back") } },
-                actions = { if (page != "detail") IconButton(onClick = { newCollection = true }) { Icon(Icons.Outlined.CreateNewFolder, "New collection") } },
+                actions = {
+                    if (page != "detail") {
+                        TextButton(onClick = { addItem() }) { Text("Add item") }
+                        IconButton(onClick = { newCollection = true }) { Icon(Icons.Outlined.CreateNewFolder, "New collection") }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Paper),
             )
         },
@@ -103,9 +108,6 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                     NavigationBarItem(selected = page == target || (target == "collections" && page == "collection"), onClick = { page = target; query = ""; collectionId = null }, icon = { Icon(icon, label) }, label = { Text(label) })
                 }
             }
-        },
-        floatingActionButton = {
-            if (!editor && page != "detail") ExtendedFloatingActionButton(onClick = { addItem() }, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("Add item") }, containerColor = Violet, contentColor = Color.White)
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -230,12 +232,13 @@ internal fun Cover(item: CatalogItem, photo: File?, modifier: Modifier = Modifie
     val base = palette[item.title.hashCode().mod(palette.size)]
     Surface(modifier, shape = RoundedCornerShape(8.dp), shadowElevation = 4.dp, color = base) {
         if (photo?.exists() == true) AsyncImage(photo, contentDescription = "Cover of ${item.title}", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(base, base.copy(red = base.red * .65f, green = base.green * .65f, blue = base.blue * .65f))))) {
+        else BoxWithConstraints(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(base, base.copy(red = base.red * .65f, green = base.green * .65f, blue = base.blue * .65f))))) {
+            val compact = maxHeight < 160.dp
             Box(Modifier.fillMaxHeight().width(6.dp).background(Color.Black.copy(alpha = .14f)))
             Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                Text(item.kind.uppercase(), color = Color.White.copy(alpha = .7f), fontSize = 9.sp, letterSpacing = 2.sp, maxLines = 1)
-                Text(item.title, fontFamily = FontFamily.Serif, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                Text(item.creator.ifBlank { "HODD" }, color = Color.White.copy(alpha = .8f), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.kind.uppercase(), color = Color.White.copy(alpha = .7f), fontSize = 9.sp, lineHeight = 12.sp, letterSpacing = 2.sp, maxLines = 1)
+                Text(item.title, fontFamily = FontFamily.Serif, color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (compact) 16.sp else 20.sp, lineHeight = if (compact) 18.sp else 24.sp, maxLines = if (compact) 3 else 4, overflow = TextOverflow.Ellipsis)
+                Text(item.creator.ifBlank { "HODD" }, color = Color.White.copy(alpha = .8f), fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
