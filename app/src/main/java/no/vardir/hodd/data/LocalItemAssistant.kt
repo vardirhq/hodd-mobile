@@ -86,7 +86,7 @@ class NanoTextModel : LocalTextModel {
         return try {
             val prompt = """
                 Extract ONLY visible cover metadata. Return compact JSON string fields:
-                subtitle, series, volume, publisher, language, releaseYear.
+                subtitle, series, volume, publisher, language, releaseYear.\n                For $kind also return attributes as a JSON object with visible details only.
                 Unknown fields must be empty. Do not guess. No markdown.
                 COVER OCR:
                 $text
@@ -94,7 +94,7 @@ class NanoTextModel : LocalTextModel {
             val extra = withTimeoutOrNull(15000) {
                 client().generateContent(generateContentRequest(TextPart(prompt)) { maxOutputTokens = 192 })
             }?.candidates?.firstOrNull()?.text.orEmpty()
-            val rawObject = extra.trim().removePrefix("JSON:").trim()
+            val rawObject = extra.trim().removePrefix("JSON:").trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
             val obj = kotlinx.serialization.json.Json.parseToJsonElement(rawObject) as? kotlinx.serialization.json.JsonObject
                 ?: error("Metadata response was not an object")
             fun extraField(key: String): String = (obj[key] as? kotlinx.serialization.json.JsonPrimitive)
@@ -102,7 +102,7 @@ class NanoTextModel : LocalTextModel {
             identity.copy(subtitle = extraField("subtitle"), series = extraField("series"),
                 volume = extraField("volume"), publisher = extraField("publisher"),
                 language = extraField("language"), releaseYear = extraField("releaseYear"),
-                status = "", lentTo = "", notes = "")
+                attributes = (obj["attributes"] as? kotlinx.serialization.json.JsonObject)?.mapNotNull { (key, value) ->\n                    val content = (value as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().trim()\n                    if (key.matches(Regex("[a-zA-Z][a-zA-Z0-9]{0,39}")) && content.length in 1..300) key to content else null\n                }?.toMap().orEmpty(), status = "", lentTo = "", notes = "")
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             Log.w(TAG, "Optional local metadata enrichment failed", error)
