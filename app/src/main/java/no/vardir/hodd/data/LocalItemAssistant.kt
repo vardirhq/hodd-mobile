@@ -3,6 +3,8 @@ package no.vardir.hodd.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
 import android.net.Uri
 import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
@@ -20,6 +22,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import no.vardir.hodd.core.ItemSuggestion
+import no.vardir.hodd.core.FieldScanRegion
 import no.vardir.hodd.core.SuggestionCodec
 import java.io.File
 
@@ -130,15 +133,33 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
         return model.suggest(text, kind, description = true)
     }
 
-    /** Recognize only the center strip of a captured photo, without generative AI. */
+    /** CameraX applies the viewport crop to disk and saves rotation in EXIF. */
     suspend fun readFieldStrip(file: File): List<String> {
-        val bitmap = withContext(Dispatchers.IO) {
-            BitmapFactory.decodeFile(file.absolutePath) ?: error("Could not read the captured image.")
+        val strip = withContext(Dispatchers.IO) {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Could not read the captured image." }
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 3000) sample *= 2
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+                ?: error("Could not read the captured image.")
+            var upright = bitmap
+            try {
+                val exif = ExifInterface(file)
+                val matrix = Matrix().apply {
+                    if (exif.isFlipped) postScale(-1f, 1f)
+                    postRotate(exif.rotationDegrees.toFloat())
+                }
+                upright = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                val region = FieldScanRegion.bounds(upright.width, upright.height)
+                // Copy also handles tiny photos where createBitmap returns the input itself.
+                val cropped = Bitmap.createBitmap(upright, region.left, region.top, region.width, region.height)
+                if (cropped === upright) requireNotNull(cropped.copy(Bitmap.Config.ARGB_8888, false)) else cropped
+            } finally {
+                if (upright !== bitmap) upright.recycle()
+                bitmap.recycle()
+            }
         }
-        val strip = try {
-            val height = (bitmap.height / 4).coerceAtLeast(1)
-            Bitmap.createBitmap(bitmap, 0, (bitmap.height - height) / 2, bitmap.width, height)
-        } finally { bitmap.recycle() }
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         return try {
             val result = recognizer.process(InputImage.fromBitmap(strip, 0)).await()

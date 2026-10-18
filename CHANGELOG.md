@@ -18,4 +18,7 @@
 - Kotlin and Compose compiler pinned to 2.1.20 for the local assistance integration.
 
 ### Fixed
+- Guided field OCR requests camera access and inserts confirmed text into the selected field.
+- The visible scan frame and OCR use the same crop, including EXIF-rotated photos.
+- Camera binding waits for preview layout and releases only its own use cases when closed.
 - The barcode scanner follows the phone’s orientation instead of forcing landscape.

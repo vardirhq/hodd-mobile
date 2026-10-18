@@ -74,3 +74,8 @@ Sources: [Open Library API](https://openlibrary.org/developers/api), [MusicBrain
 - Norwegian strings, dark theme, and refinement against the design references.
 
 No desktop catalog or GESH sync compatibility is claimed by this version.
+
+
+### Guided field scanning
+
+Tap the scan icon beside a supported text field to open a camera with a visible horizontal frame. Only text inside that frame is read, entirely on-device. Capture, choose a recognized line, and it is inserted into the selected field; other fields are kept. Camera access is requested on first use. The crop uses the same normalized bounds as the overlay and honors photo EXIF orientation. EAN/ISBN scanning remains a secondary button beside the identifier input; title/creator search is preferred.
