@@ -76,7 +76,6 @@ class NanoTextModel : LocalTextModel {
         """.trimIndent()
         val response = withTimeoutOrNull(30000) {
             client().generateContent(generateContentRequest(TextPart(instruction)) {
-                temperature = 0.0f
                 maxOutputTokens = 512
             })
         } ?: error("Local AI took too long. Try a shorter description or use the form.")
@@ -122,7 +121,7 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
                 notice = when {
                     error.message?.contains("too long", ignoreCase = true) == true -> "Local AI timed out. Cover text was read on-device; choose a title below."
                     error.message?.contains("unusable response", ignoreCase = true) == true -> "Local AI returned an unusable response. Cover text was read on-device; choose a title below."
-                    else -> "Local AI could not finish (${error.javaClass.simpleName}). Cover text was read on-device; choose a title below."
+                    else -> "Local AI could not finish (${error.javaClass.simpleName}: ${error.message?.take(140) ?: "no details"}). Cover text was read on-device; choose a title below."
                 }
             }
         }
