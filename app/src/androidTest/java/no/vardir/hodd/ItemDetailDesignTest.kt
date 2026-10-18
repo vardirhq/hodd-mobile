@@ -49,15 +49,15 @@ class ItemDetailDesignTest {
         compose.onNodeWithText(item.title).performScrollTo().performClick()
         compose.onNodeWithTag("item-title").assertTextEquals(item.title)
         capture("08-detail-hero")
-        reveal("ON LOAN").assertExists()
+        reveal("ON LOAN", 2).assertExists()
         compose.onNodeWithText("Unsure").assertExists()
-        reveal("Nintendo Switch").assertExists()
+        reveal("Nintendo Switch", 3).assertExists()
         capture("09-detail-metadata")
-        reveal("About this edition").assertExists()
-        reveal("The Legend of Zelda").assertExists()
-        reveal("Identifiers & source").performClick()
-        reveal("123456789").assertExists()
-        reveal("https://example.org/item").assertExists()
+        reveal("About this edition", 4).assertExists()
+        reveal("The Legend of Zelda", 4).assertExists()
+        reveal("Identifiers & source", 6).performClick()
+        reveal("123456789", 6).assertExists()
+        reveal("https://example.org/item", 6).assertExists()
         compose.onNodeWithTag("detail-edit").assertIsDisplayed().performClick()
         compose.onNodeWithText("Title *").assertTextContains(item.title)
         compose.runOnIdle {
@@ -79,14 +79,14 @@ class ItemDetailDesignTest {
         }
         compose.onNodeWithTag("item-title").performScrollTo().assertExists()
         capture("10-detail-large-text")
-        reveal("English").assertExists()
-        reveal(item.notes).assertExists()
+        reveal("English", 3).assertExists()
+        reveal(item.notes, 5).assertExists()
         compose.onNodeWithTag("detail-edit").assertIsDisplayed().performClick()
         assertTrue(edited)
     }
 
-    private fun reveal(text: String): SemanticsNodeInteraction {
-        compose.onNodeWithTag("item-detail-scroll").performScrollToNode(hasText(text))
+    private fun reveal(text: String, section: Int): SemanticsNodeInteraction {
+        compose.onNodeWithTag("item-detail-scroll").performScrollToIndex(section)
         return compose.onNodeWithText(text).performScrollTo()
     }
 

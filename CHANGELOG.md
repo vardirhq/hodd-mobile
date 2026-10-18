@@ -25,3 +25,7 @@
 - The visible scan frame and OCR use the same crop, including EXIF-rotated photos.
 - Camera binding waits for preview layout and releases only its own use cases when closed.
 - The barcode scanner follows the phone’s orientation instead of forcing landscape.
+
+### APK signing and updates
+- Added private-key signing configuration, increasing CI version codes, a one-time secret setup helper, and a dedicated install artifact.
+- Added emulator replacement checks for catalog and photo preservation; test-only builds are labeled separately when signing is not configured.

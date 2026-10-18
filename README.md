@@ -33,7 +33,7 @@ Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Co
 
 Set `ANDROID_HOME` or put `sdk.dir=/path/to/android-sdk` in an untracked `local.properties`. Open the root directory in Android Studio to run on a device. Minimum Android version: 8.0 (API 26).
 
-Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
+Installable CI APKs use a permanent private key and increasing version codes once signing is configured. See [APK signing and updates](docs/SIGNING.md). The `hodd-mobile-test-apks` artifact is for CI; install `hodd-mobile-install` for updates. Local debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 Device/emulator checks:
 

@@ -11,6 +11,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HODD_VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -21,13 +23,51 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Restore persistent signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HODD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.HODD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.HODD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.HODD_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64$STORE_PASSWORD$KEY_ALIAS$KEY_PASSWORD" ]; then
+            echo 'Signing is not configured. Test APKs only; do not distribute them.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            KEY_ALIAS=hodd-ci-test
+            STORE_PASSWORD=ci-test-only
+            KEY_PASSWORD=ci-test-only
+            keytool -genkeypair -noprompt -storetype PKCS12 -keystore "$RUNNER_TEMP/hodd-signing.jks" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -keyalg RSA -keysize 3072 -validity 2 -dname 'CN=Hodd CI Test Only'
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            test -n "$KEYSTORE_BASE64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
+            umask 077
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hodd-signing.jks"
+          fi
+          echo "HODD_KEYSTORE_PATH=$RUNNER_TEMP/hodd-signing.jks" >> "$GITHUB_ENV"
+          echo "HODD_KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "HODD_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "HODD_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
       - run: ./gradlew :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+      - name: Build and verify signed APK
+        run: |
+          ./gradlew :app:assembleRelease
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: hodd-mobile-debug
+          name: hodd-mobile-test-apks
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.ready == 'true'
+        with:
+          name: hodd-mobile-install
+          path: app/build/outputs/apk/release/app-release.apk
+      - name: Remove private signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hodd-signing.jks"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -37,6 +77,7 @@ jobs:
             app/build/reports/lint-results-debug.html
 
   device-tests:
+    timeout-minutes: 15
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -51,7 +92,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - uses: actions/download-artifact@v4
         with:
-          name: hodd-mobile-debug
+          name: hodd-mobile-test-apks
           path: built-apks
       - name: Enable emulator acceleration
         run: |
@@ -69,6 +110,7 @@ jobs:
             adb install -r built-apks/debug/app-debug.apk
             adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (16 tests)' device-tests.txt
+            bash scripts/check-apk-update.sh built-apks/debug/app-debug.apk built-apks/release/app-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:

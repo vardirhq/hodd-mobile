@@ -3,6 +3,15 @@ plugins {
     kotlin("android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val hoddVersionCode = providers.environmentVariable("HODD_VERSION_CODE").orElse("1").get().toInt()
+val hoddSigningPath = providers.environmentVariable("HODD_KEYSTORE_PATH").orNull
+val hoddSigningPassword = providers.environmentVariable("HODD_KEYSTORE_PASSWORD").orNull
+val hoddSigningAlias = providers.environmentVariable("HODD_KEY_ALIAS").orNull
+val hoddKeyPassword = providers.environmentVariable("HODD_KEY_PASSWORD").orNull
+val hoddSigningReady = listOf(hoddSigningPath, hoddSigningPassword, hoddSigningAlias, hoddKeyPassword).all { !it.isNullOrBlank() }
+check(listOf(hoddSigningPath, hoddSigningPassword, hoddSigningAlias, hoddKeyPassword).all { it.isNullOrBlank() } || hoddSigningReady) {
+    "Provide all four Hodd signing variables together."
+}
 android {
     namespace = "no.vardir.hodd"
     compileSdk = 35
@@ -11,9 +20,23 @@ android {
         applicationId = "no.vardir.hodd"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        versionCode = hoddVersionCode
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        if (hoddSigningReady) create("persistent") {
+            storeFile = file(hoddSigningPath!!)
+            storePassword = hoddSigningPassword
+            keyAlias = hoddSigningAlias
+            keyPassword = hoddKeyPassword
+        }
+    }
+    buildTypes {
+        if (hoddSigningReady) {
+            getByName("debug").signingConfig = signingConfigs.getByName("persistent")
+            getByName("release").signingConfig = signingConfigs.getByName("persistent")
+        }
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -22,6 +45,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+}
+tasks.configureEach {
+    if (name == "preReleaseBuild") doFirst {
+        check(hoddSigningReady) { "Release APKs require the persistent Hodd signing key. See docs/SIGNING.md." }
+    }
 }
 dependencies {
     implementation(project(":core"))
