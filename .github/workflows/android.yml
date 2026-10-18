@@ -65,6 +65,7 @@ jobs:
           profile: pixel_5
           disable-animations: true
           script: |
+            adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb install -r built-apks/debug/app-debug.apk
             adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (14 tests)' device-tests.txt

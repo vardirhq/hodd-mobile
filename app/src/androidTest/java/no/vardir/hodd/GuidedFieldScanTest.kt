@@ -15,7 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.exifinterface.media.ExifInterface
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -36,7 +40,7 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class GuidedFieldScanTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     @get:Rule val permission: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.CAMERA)
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -79,31 +83,51 @@ class GuidedFieldScanTest {
         compose.onNodeWithText("Publisher / label").performScrollTo().assertTextContains("Original publisher")
     }
 
-    @Test fun cameraBindsAfterLayoutAndShowsTheScanFrame() {
-        var error: String? = null
-        val file = File(context.cacheDir, "camera-frame-test.jpg")
+    @Test fun editorCameraKeepsCaptureAboveButtonNavigationAndCanCapture() {
+        val messages = mutableListOf<String>()
+        compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
         compose.setContent {
             HoddTheme {
-                Box(Modifier.fillMaxSize()) {
-                    GuidedFieldCamera("Publisher", file, {}, {}, { error = it })
-                }
+                ItemEditor(CatalogItem(collectionId = "shelf", title = "My book"),
+                    listOf(Collection(id = "shelf", name = "Shelf")), "shelf", false,
+                    photo = { null }, importPhoto = { _, done -> done(null) },
+                    save = {}, cancel = {}, message = { messages += it })
             }
         }
+        // Open from a focused field, as on the phone, rather than rendering the camera alone.
+        compose.onNodeWithText("Creator / author").performClick().performTextInput("Draft author")
+        compose.onNodeWithContentDescription("Scan Creator").performScrollTo().performClick()
         compose.onNodeWithTag("field-scan-frame").assertExists()
         compose.onNodeWithText("Only text inside the frame will be read").assertExists()
         compose.waitUntil(20000) {
-            error != null || compose.onAllNodesWithText("Capture text").fetchSemanticsNodes()
+            messages.isNotEmpty() || compose.onAllNodesWithTag("field-capture-button").fetchSemanticsNodes()
                 .any { it.config.getOrNull(SemanticsProperties.Disabled) == null }
         }
-        assertNull(error)
-        compose.onNodeWithText("Capture text").assertIsEnabled()
+        assertTrue("Camera failed: $messages", messages.isEmpty())
+        val button = compose.onNodeWithTag("field-capture-button")
+        button.assertIsDisplayed().assertIsEnabled()
+        compose.waitForIdle()
+        val density = context.resources.displayMetrics.density
+        val navigationBottom = compose.runOnIdle {
+            requireNotNull(ViewCompat.getRootWindowInsets(compose.activity.window.decorView))
+                .getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        }
+        assertTrue("Run this regression with three-button navigation", navigationBottom / density >= 32f)
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val bounds = button.getUnclippedBoundsInRoot()
+        assertTrue("Capture button overlaps system navigation: $bounds / $screen",
+            bounds.bottom.value <= screen.bottom.value - navigationBottom / density - 12f)
+        assertTrue("Capture target is too small", bounds.height.value >= 56f)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.waitForIdleSync()
         val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(directory, "07-guided-field-camera.png").outputStream().use {
             checkNotNull(instrumentation.uiAutomation.takeScreenshot()).compress(Bitmap.CompressFormat.PNG, 100, it)
         }
-        file.delete()
+        // Exercise a real capture to prove the visible button is actionable.
+        button.performClick()
+        compose.waitUntil(20000) { compose.onAllNodesWithTag("field-scan-frame").fetchSemanticsNodes().isEmpty() }
+        assertFalse("Camera could not capture: $messages", messages.any { it.contains("Could not capture") })
     }
 
     private fun writeFixture(file: File, rotated: Boolean = false) {

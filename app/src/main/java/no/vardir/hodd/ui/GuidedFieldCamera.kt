@@ -126,7 +126,9 @@ internal fun GuidedFieldCamera(
                                 if (active.value) { capturing = false; errorCallback("Could not capture text. Try again.") }
                             }
                         })
-                }, enabled = capture != null && !capturing, shape = RoundedCornerShape(40.dp)) {
+                }, enabled = capture != null && !capturing,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("field-capture-button"),
+                    shape = RoundedCornerShape(40.dp)) {
                     Text(if (capturing) "Capturing…" else "Capture text")
                 }
             }

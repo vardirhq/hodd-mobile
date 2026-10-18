@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -45,6 +47,8 @@ internal fun ItemEditor(
     },
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
     DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
@@ -131,12 +135,35 @@ internal fun ItemEditor(
     @Composable
     fun scanAction(field: String) {
         IconButton(onClick = {
+            focusManager.clearFocus()
+            keyboard?.hide()
             lastScanField = field
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) fieldScan = field
             else fieldPermission.launch(Manifest.permission.CAMERA)
         }, enabled = !busy && !assisting && !importing) {
             Icon(Icons.Outlined.DocumentScanner, "Scan " + field)
         }
+    }
+    fieldScan?.let { field ->
+        val file = remember(field) { File(context.cacheDir, "field-ocr-" + UUID.randomUUID() + ".jpg") }
+        BackHandler { fieldScan = null; file.delete() }
+        // Use the host activity's full screen and insets. A wrap-content Dialog can
+        // measure beyond the visible window and put the capture button under system navigation.
+        fieldCamera(field, file, { captured ->
+            lastScanField = field
+            fieldScan = null
+            assisting = true
+            scope.launch {
+                try {
+                    scanResults = fieldAssistant.readFieldStrip(captured)
+                    if (scanResults.isEmpty()) message("No text found inside the highlighted strip.")
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    message("Text recognition failed. Try again or enter the field manually.")
+                } finally { captured.delete(); assisting = false }
+            }
+        }, { fieldScan = null; file.delete() }, { message(it); fieldScan = null; file.delete() })
+        return
     }
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
@@ -242,26 +269,6 @@ internal fun ItemEditor(
                 }, enabled = !busy && !assisting) { Icon(Icons.Outlined.QrCodeScanner, "Scan EAN / ISBN") }
             }
             OutlinedTextField(notes, { notes = it }, label = { Text("Notes / condition") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-        }
-    }
-    fieldScan?.let { field ->
-        val file = remember(field) { File(context.cacheDir, "field-ocr-" + UUID.randomUUID() + ".jpg") }
-        androidx.compose.ui.window.Dialog(onDismissRequest = { if (!assisting) { fieldScan = null; file.delete() } },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-            fieldCamera(field, file, { captured ->
-                lastScanField = field
-                fieldScan = null
-                assisting = true
-                scope.launch {
-                    try {
-                        scanResults = fieldAssistant.readFieldStrip(captured)
-                        if (scanResults.isEmpty()) message("No text found inside the highlighted strip.")
-                    } catch (error: Exception) {
-                        if (error is CancellationException) throw error
-                        message("Text recognition failed. Try again or enter the field manually.")
-                    } finally { captured.delete(); assisting = false }
-                }
-            }, { fieldScan = null; file.delete() }, { message(it); fieldScan = null; file.delete() })
         }
     }
     if (scanResults.isNotEmpty()) AlertDialog(
