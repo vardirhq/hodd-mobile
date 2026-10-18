@@ -22,6 +22,7 @@ class DesignScreenshotsTest {
         compose.waitForIdle()
         val application = ApplicationProvider.getApplicationContext<Application>()
         val directory = File(application.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(directory, "$name.txt").writeText(compose.onRoot(useUnmergedTree = true).printToString())
         File(directory, "$name.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
@@ -38,7 +39,7 @@ class DesignScreenshotsTest {
         capture("01-home")
         compose.onNodeWithText("The reading shelf").performClick()
         capture("02-collection")
-        compose.onNodeWithText("Add item").performClick()
+        compose.onNodeWithText("Add item", useUnmergedTree = true).performClick()
         capture("03-add-item")
         compose.onNodeWithText("Title *").performTextInput("A new discovery")
         compose.onNodeWithText("Save to collection").performClick()

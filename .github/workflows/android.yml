@@ -25,7 +25,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: hodd-mobile-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -47,6 +49,10 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hodd-mobile-debug
+          path: built-apks
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -58,10 +64,10 @@ jobs:
           arch: x86_64
           profile: pixel_5
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest
-      - name: Collect screen captures
-        if: always()
-        run: adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true
+          script: |
+            adb install -r built-apks/debug/app-debug.apk
+            adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (4 tests)' device-tests.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -69,3 +75,4 @@ jobs:
           path: |
             app/build/reports/androidTests/
             screenshots/
+            device-tests.txt

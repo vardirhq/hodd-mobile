@@ -32,5 +32,6 @@ class PersistenceTest {
         try { repository.update { Catalog() }; fail("Expected write refusal") } catch (_: IllegalStateException) { }
         assertEquals("broken", file.readText())
         file.delete()
+        Unit
     }
 }

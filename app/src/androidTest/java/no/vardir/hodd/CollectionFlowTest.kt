@@ -26,7 +26,7 @@ class CollectionFlowTest {
         compose.onNodeWithText("Collection name").performTextInput("My books")
         compose.onNodeWithText("Create", useUnmergedTree = true).performClick()
         compose.waitUntil(5000) { vm.catalog.value.collections.size == 1 }
-        compose.onNodeWithText("Add item").performClick()
+        compose.onNodeWithText("Add item", useUnmergedTree = true).performClick()
         compose.onNodeWithText("Title *").performTextInput("My first book")
         compose.onNodeWithText("Save to collection").performClick()
         compose.waitUntil(5000) { vm.catalog.value.items.size == 1 }
