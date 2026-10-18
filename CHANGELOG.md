@@ -12,3 +12,4 @@
 ### Changed
 
 ### Fixed
+- The barcode scanner follows the phone’s orientation instead of forcing landscape.

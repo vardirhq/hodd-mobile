@@ -67,7 +67,7 @@ jobs:
           script: |
             adb install -r built-apks/debug/app-debug.apk
             adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (4 tests)' device-tests.txt
+            adb shell am instrument -w no.vardir.hodd.test/androidx.test.runner.AndroidJUnitRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (5 tests)' device-tests.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
