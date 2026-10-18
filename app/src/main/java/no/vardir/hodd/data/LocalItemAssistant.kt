@@ -1,6 +1,8 @@
 package no.vardir.hodd.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
@@ -126,6 +128,23 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
         require(text.length <= 3000) { "Keep the description under 3,000 characters." }
         require(status() == LocalAiStatus.AVAILABLE) { "Local AI is not available. You can still read a cover or enter details manually." }
         return model.suggest(text, kind, description = true)
+    }
+
+    /** Recognize only the center strip of a captured photo, without generative AI. */
+    suspend fun readFieldStrip(file: File): List<String> {
+        val bitmap = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeFile(file.absolutePath) ?: error("Could not read the captured image.")
+        }
+        val strip = try {
+            val height = (bitmap.height / 4).coerceAtLeast(1)
+            Bitmap.createBitmap(bitmap, 0, (bitmap.height - height) / 2, bitmap.width, height)
+        } finally { bitmap.recycle() }
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        return try {
+            val result = recognizer.process(InputImage.fromBitmap(strip, 0)).await()
+            result.textBlocks.flatMap { it.lines }.map { it.text.trim() }
+                .filter { it.isNotBlank() }.distinct().take(12)
+        } finally { recognizer.close(); strip.recycle() }
     }
 
     suspend fun readCover(file: File, kind: String): LocalSuggestions {
