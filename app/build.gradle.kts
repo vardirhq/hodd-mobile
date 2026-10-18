@@ -26,6 +26,10 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
     implementation("com.google.mlkit:genai-prompt:1.0.0-alpha1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
