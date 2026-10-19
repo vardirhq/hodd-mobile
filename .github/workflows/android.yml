@@ -124,7 +124,7 @@ jobs:
           avd-name: hodd-ci-api35
           force-avd-creation: false
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene
           script: |
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb install -r built-apks/debug/app-debug.apk
