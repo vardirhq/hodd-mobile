@@ -34,6 +34,7 @@ private data class DetailFact(val label: String, val value: String)
 private val DetailGreen = Color(0xFF365B4A)
 private val DetailGold = Color(0xFF8B652B)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edit: () -> Unit, delete: () -> Unit, busy: Boolean) {
     var confirmDelete by rememberSaveable(item.id) { mutableStateOf(false) }
