@@ -78,4 +78,26 @@ class CatalogTest {
         assertEquals(Counts(2, 1, 0), demo.counts())
         assertTrue(Catalog().items.isEmpty())
     }
+
+    @Test fun `tags and locations normalize and survive catalog roundtrip`() {
+        val catalog = empty.save(item().copy(tags = listOf(" Co-op ", "co-op", "Sealed"), location = " Shelf A "))
+        val restored = CatalogCodec.decode(CatalogCodec.encode(catalog))
+        assertEquals(listOf("Co-op", "Sealed"), restored.items.single().tags)
+        assertEquals("Shelf A", restored.items.single().location)
+        assertEquals(1, restored.search("sealed").size)
+        assertEquals(1, restored.search("shelf").size)
+        assertFailsWith<IllegalArgumentException> { empty.save(item().copy(tags = List(31) { "tag$" + "it" })) }
+    }
+
+    @Test fun `saved views dynamically filter and survive serialization`() {
+        val catalog = empty
+            .save(item().copy(tags = listOf("Co-op"), location = "Living room"))
+            .save(item("two").copy(tags = listOf("Solo"), location = "Attic"))
+            .addSavedView("Living co-op", collectionId = shelf.id, tag = "co-op", location = "Living room")
+        val restored = CatalogCodec.decode(CatalogCodec.encode(catalog))
+        assertEquals(listOf("one"), restored.itemsForView(restored.savedViews.single()).map { it.id })
+        val changed = restored.save(item().copy(tags = listOf("Solo"), location = "Living room"))
+        assertTrue(changed.itemsForView(changed.savedViews.single()).isEmpty())
+        assertTrue(changed.removeSavedView(changed.savedViews.single().id).savedViews.isEmpty())
+    }
 }
