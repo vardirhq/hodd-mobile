@@ -70,6 +70,9 @@ internal fun ItemEditor(
     var barcode by rememberSaveable(draftId) { mutableStateOf(existing?.barcode.orEmpty()) }
     var statusName by rememberSaveable(draftId) { mutableStateOf((existing?.status ?: ItemStatus.OWNED).name) }
     var notes by rememberSaveable(draftId) { mutableStateOf(existing?.notes.orEmpty()) }
+    var tags by rememberSaveable(draftId) { mutableStateOf(existing?.tags.orEmpty()) }
+    var tagInput by rememberSaveable(draftId) { mutableStateOf("") }
+    var location by rememberSaveable(draftId) { mutableStateOf(existing?.location.orEmpty()) }
     var lentTo by rememberSaveable(draftId) { mutableStateOf(existing?.lentTo.orEmpty()) }
     var photoName by rememberSaveable(draftId) { mutableStateOf(existing?.photoName) }
     var photoNames by rememberSaveable(draftId) { mutableStateOf(existing?.photoNames.orEmpty()) }
@@ -101,8 +104,8 @@ internal fun ItemEditor(
     var pendingBrand by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val status = ItemStatus.valueOf(statusName)
-    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames)
-    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
+    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames, tags, location)
+    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || tags.isNotEmpty() || location.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
     fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
@@ -282,6 +285,42 @@ internal fun ItemEditor(
                 Box(Modifier.weight(1f)) { SearchableChoice("format", "Format / edition", format, FieldChoices.formats(kind), enabled = canChoose,
                     saved = savedItems.filter { it.kind == kind }.map { it.format }) { format = it } }
                 scanAction("Format")
+            }
+            Text("Organization", style = MaterialTheme.typography.titleLarge)
+            SearchableChoice(
+                "location", "Storage location", location, emptyList(),
+                enabled = canChoose, saved = savedItems.map { it.location }.filter { it.isNotBlank() },
+            ) { location = it }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    tagInput, { tagInput = it.take(60) },
+                    label = { Text("Add a tag") },
+                    singleLine = true, modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = {
+                        val tag = tagInput.trim()
+                        if (tag.isNotEmpty() && tags.size < 30 && tags.none { it.equals(tag, ignoreCase = true) }) {
+                            tags = tags + tag
+                        }
+                        tagInput = ""
+                    },
+                    enabled = tagInput.isNotBlank() && tags.size < 30,
+                ) { Text("Add") }
+            }
+            if (tags.isNotEmpty()) {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    tags.forEach { tag ->
+                        InputChip(
+                            selected = false,
+                            onClick = { tags = tags.filterNot { it == tag } },
+                            label = { Text(tag) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, "Remove $tag", Modifier.size(16.dp)) },
+                        )
+                    }
+                }
             }
             Text("Additional details", style = MaterialTheme.typography.titleLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {

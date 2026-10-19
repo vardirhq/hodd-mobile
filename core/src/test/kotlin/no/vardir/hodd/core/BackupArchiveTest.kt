@@ -33,6 +33,24 @@ class BackupArchiveTest {
         assertEquals(1, staged.photoCount)
         assertContentEquals(byteArrayOf(1, 2, 3, 4), File(staged.directory, "photos/cover.jpg").readBytes())
     }
+    @Test fun `tags locations and saved views survive a portable backup`() = temporary { root ->
+        val organized = catalog.copy(
+            items = catalog.items.map { it.copy(tags = listOf("Signed", "Rare"), location = "Shelf A") },
+            savedViews = listOf(SavedView(id = "rare-shelf", name = "Rare shelf", collectionId = "books", tag = "Rare", location = "Shelf A")),
+        )
+        val photo = File(root, "cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3, 4)) }
+        val bytes = ByteArrayOutputStream().also { BackupArchive.write(organized, { photo }, it, "0.1.0-alpha.2") }.toByteArray()
+        val staged = BackupArchive.stage(bytes.inputStream(), File(root, "organized"))
+        assertEquals(organized, staged.catalog)
+        assertEquals(listOf("one"), staged.catalog.itemsForView(staged.catalog.savedViews.single()).map { it.id })
+    }
+    @Test fun `legacy catalog without organization fields still loads`() {
+        val encoded = """{"version":1,"collections":[{"id":"books","name":"Books"}],"items":[{"id":"legacy","collectionId":"books","title":"Old book"}]}"""
+        val restored = CatalogCodec.decode(encoded)
+        assertTrue(restored.items.single().tags.isEmpty())
+        assertTrue(restored.items.single().location.isEmpty())
+        assertTrue(restored.savedViews.isEmpty())
+    }
     @Test fun `modified content fails checksum validation and staging is removed`() = temporary { root ->
         val changed = entries(backup(root)).map { if (it.first == "catalog.json") it.first to CatalogCodec.encode(catalog.copy(items = emptyList())).toByteArray() else it }
         val destination = File(root, "staged")
