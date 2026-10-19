@@ -34,6 +34,8 @@ import no.vardir.hodd.core.FieldChoice
 import no.vardir.hodd.core.ItemStatus
 import no.vardir.hodd.core.withSuggestion
 import no.vardir.hodd.data.LocalItemAssistant
+import no.vardir.hodd.data.ProductLinkImporter
+import no.vardir.hodd.data.ProductPreview
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import java.io.File
@@ -89,6 +91,9 @@ internal fun ItemEditor(
     }
     var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var productUrl by rememberSaveable(draftId) { mutableStateOf("") }
+    var fetchingProduct by remember { mutableStateOf(false) }
+    var productPreview by remember { mutableStateOf<ProductPreview?>(null) }
     var assisting by remember { mutableStateOf(false) }
     var metadataSource by rememberSaveable(draftId) { mutableStateOf(existing?.metadataSource.orEmpty()) }
     var metadataId by rememberSaveable(draftId) { mutableStateOf(existing?.metadataId.orEmpty()) }
@@ -106,7 +111,7 @@ internal fun ItemEditor(
     val status = ItemStatus.valueOf(statusName)
     val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames, tags, location)
     val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || tags.isNotEmpty() || location.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
-    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
+    fun close() { if (!busy && !importing && !assisting && !fetchingProduct) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { barcode = it; message("Identifier inserted.") }
@@ -204,6 +209,58 @@ internal fun ItemEditor(
             return
         }
     }
+    productPreview?.let { found ->
+        AlertDialog(onDismissRequest = { productPreview = null },
+            title = { Text("Import product details?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(found.title, style = MaterialTheme.typography.titleMedium)
+                    if (found.brand.isNotBlank()) Text("Brand: ${found.brand}")
+                    if (found.price.isNotBlank()) Text("Store price: ${found.price} ${found.currency}")
+                    Text("This will fill empty fields only. You can edit everything before saving.")
+                    if (found.imageUrl.isNotBlank()) Text("A product image will be imported when available.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    productPreview = null
+                    if (title.isBlank()) title = found.title
+                    if (publisher.isBlank()) publisher = found.brand
+                    if (notes.isBlank()) notes = found.description
+                    if (metadataUrl.isBlank()) metadataUrl = found.url
+                    if (metadataSource.isBlank()) metadataSource = "Product link"
+                    if (found.price.isNotBlank() && !attributes.containsKey("Store price"))
+                        attributes = attributes + ("Store price" to "${found.price} ${found.currency}".trim())
+                    if (found.imageUrl.isNotBlank() && photoName == null) {
+                        fetchingProduct = true
+                        scope.launch {
+                            var temp: File? = null
+                            try {
+                                val bytes = ProductLinkImporter.downloadImage(found.imageUrl)
+                                temp = File(context.cacheDir, "hodd-product-${UUID.randomUUID()}.jpg")
+                                temp.writeBytes(bytes)
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", temp)
+                                importing = true
+                                importPhoto(uri) { imported ->
+                                    if (imported != null) {
+                                        createdPhotos.add(imported)
+                                        photoName = imported
+                                    } else message("Product details imported, but the image could not be saved.")
+                                    importing = false
+                                }
+                            } catch (error: Exception) {
+                                if (error is CancellationException) throw error
+                                message("Product details imported, but the image could not be downloaded.")
+                            } finally {
+                                temp?.delete()
+                                fetchingProduct = false
+                            }
+                        }
+                    }
+                }) { Text("Use details") }
+            },
+            dismissButton = { TextButton(onClick = { productPreview = null }) { Text("Cancel") } })
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
@@ -218,6 +275,26 @@ internal fun ItemEditor(
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(editorScroll).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
             Text("Read a cover, identify an item, or add details yourself. Your collection is stored on this device.", color = Muted)
+            Text("Import from a store", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(productUrl, { productUrl = it }, modifier = Modifier.fillMaxWidth(),
+                label = { Text("Product page URL") }, singleLine = true,
+                placeholder = { Text("https://store.example/product") })
+            Button(onClick = {
+                fetchingProduct = true
+                scope.launch {
+                    try {
+                        productPreview = ProductLinkImporter.preview(productUrl)
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        message(error.message ?: "Could not read this product page.")
+                    } finally { fetchingProduct = false }
+                }
+            }, enabled = productUrl.startsWith("https://", ignoreCase = true) &&
+                !busy && !importing && !assisting && !fetchingProduct) {
+                if (fetchingProduct) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.Link, null)
+                Spacer(Modifier.width(8.dp)); Text("Fetch product details")
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Cover(draft.copy(title = title.ifBlank { "Your next find" }), photo(photoName), Modifier.width(95.dp).height(130.dp))
                 Column(Modifier.weight(1f)) {
