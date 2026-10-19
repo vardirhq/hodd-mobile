@@ -205,7 +205,7 @@ internal fun ItemEditor(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
             Surface(shadowElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
-                Button(onClick = { save(draft); createdPhotos.clear() }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
+                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
                     if (busy || importing || assisting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     else { Icon(Icons.Outlined.Check, null); Spacer(Modifier.width(8.dp)); Text(if (existing == null) "Save to collection" else "Save changes") }
                 }
@@ -404,7 +404,7 @@ internal fun ItemEditor(
             }) { Text("Change brand") } },
             dismissButton = { TextButton(onClick = { pendingBrand = null }) { Text("Keep platform") } })
     }
-    if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = cancel) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
+    if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = { discardUnsavedPhotos(); cancel() }) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
 }
 
 private val AttributeSaver = mapSaver<Map<String, String>>(
