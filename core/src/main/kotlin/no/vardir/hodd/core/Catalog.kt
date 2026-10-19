@@ -35,6 +35,8 @@ data class CatalogItem(
     val releaseYear: String = "",
     val condition: String = "",
     val attributes: Map<String, String> = emptyMap(),
+    // Additional photos; photoName remains the primary cover for legacy catalogs.
+    val photoNames: List<String> = emptyList(),
 )
 
 @Serializable
