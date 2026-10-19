@@ -30,7 +30,7 @@ class DesignScreenshotsTest {
 
     @Test fun capturesHomeCollectionAndAddItem() {
         val application = ApplicationProvider.getApplicationContext<Application>()
-        File(application.filesDir, "catalog.json").delete()
+        resetUiCatalog(application)
         val vm = HoddViewModel(application)
         compose.setContent { HoddTheme { HoddApp(vm) } }
         compose.waitUntil(10000) { vm.ready.value }

@@ -4,6 +4,10 @@ set -euo pipefail
 debug_apk=${1:?Debug APK required}
 release_apk=${2:?Release APK required}
 app=no.vardir.hodd
+if [ "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" != '1' ]; then
+  echo 'The data-replacement fixture requires a disposable emulator.' >&2
+  exit 1
+fi
 adb shell am force-stop "$app"
 adb shell run-as "$app" sh -c "'mkdir -p files/photos; printf hodd-upgrade-photo > files/photos/upgrade-test.jpg'"
 # Own the fixture instead of depending on another test's cleanup/order.

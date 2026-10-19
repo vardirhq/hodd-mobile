@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import no.vardir.hodd.BuildConfig
 
 @Composable
-internal fun AboutHodd(close: () -> Unit) {
+internal fun AboutHodd(backups: () -> Unit, close: () -> Unit) {
     var showChanges by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val notes = remember { context.assets.open("CHANGELOG.md").bufferedReader().use { it.readLines() } }
@@ -28,6 +28,7 @@ internal fun AboutHodd(close: () -> Unit) {
                 if (!showChanges) {
                     Text("A local home for the things you collect.")
                     Text("Early alpha. Your catalog and photos stay on this device.", color = Muted)
+                    TextButton(onClick = backups) { Text("Backups & recovery") }
                     TextButton(onClick = { showChanges = true }) { Text("View changelog") }
                 } else {
                     notes.filter { it.isNotBlank() && it != "# Changelog" }.forEach { line ->

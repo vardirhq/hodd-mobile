@@ -2,7 +2,7 @@
 
 A native Android home for the things you collect. Built with Kotlin and Jetpack Compose, inspired by [Hodd for desktop](https://github.com/vardirhq/hodd).
 
-**Early development · 0.1.0-alpha.1** — the initial offline collection flows are implemented. This is not a production release.
+**Early development · 0.1.0-alpha.2** — the initial offline collection flows are implemented. This is not a production release.
 
 ## What you can do
 
@@ -15,6 +15,7 @@ A native Android home for the things you collect. Built with Kotlin and Jetpack 
 - Review fetched details and optionally download artwork from Open Library or Cover Art Archive.
 - Read cover text offline using bundled ML Kit recognition; prefer Gemini Nano to structure that text when available.
 - Describe an item naturally to propose fields using on-device AI on supported devices.
+- Export and restore verified catalog/photo backups; recover recent catalog revisions.
 - Use every collection feature offline, without an account or server.
 
 Open **Find and fill details → Find online** to search by title and optionally creator. Title search takes priority even if an EAN/ISBN is present. With the title left empty, lookup can use a scanned or manually entered identifier. Select Book/Comic for Open Library or CD/Vinyl for MusicBrainz. Games and movies currently support local cover recognition and manual entry, not online metadata lookup.
@@ -35,7 +36,7 @@ Set `ANDROID_HOME` or put `sdk.dir=/path/to/android-sdk` in an untracked `local.
 
 Installable CI APKs use a permanent private key and increasing version codes once signing is configured. See [APK signing and updates](docs/SIGNING.md). The `hodd-mobile-test-apks` artifact is for CI; install `hodd-mobile-install` for updates. Local debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
-Device/emulator checks:
+Automated data tests (disposable emulator only; fixtures replace the test app catalog, and the runner refuses physical devices):
 
 ```sh
 ./gradlew :app:connectedDebugAndroidTest
@@ -67,12 +68,16 @@ Hodd checks Gemini Nano availability at runtime. AICore/device/model support var
 Sources: [Open Library API](https://openlibrary.org/developers/api), [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive). Cover artwork remains subject to its respective rights. Bundled OCR and the AICore integration are Google ML Kit components and may perform SDK/service diagnostics independently of Hodd; consult [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
 
 ## Data storage
- Android cloud backup is disabled for this initial version; uninstalling the app removes its local data. Import/export and photo cleanup are still pending, so use this version for evaluation.
+Open **About Hodd → Backups & recovery** to export a ZIP containing your collections, item details and referenced photos. The selected file is read back and checked before Hodd reports a verified export. Keep an exported copy on another device or in cloud storage, and make a new backup after important changes.
+
+Saves use atomic writes with synchronization and readback verification. Up to 20 local catalog revisions are retained; old photo files are kept so recovery can restore their references. Import validates checksums, catalog relationships and required photos in temporary storage, shows a preview and requires confirmation. The previous catalog is preserved before replacement. An unreadable or unexpectedly missing catalog blocks editing and offers recovery rather than silently resetting data.
+
+Internal recovery copies are removed by uninstalling or clearing app data. Android cloud backup remains disabled; there is no automatic cloud sync. Local revisions protect against some editing and file failures, but an independently stored export is needed for device loss or uninstall. Photos retained for recovery can increase storage use. See [backup and recovery details](docs/BACKUPS.md).
 
 ## Next steps
 
 - Additional metadata sources and duplicate suggestions after scanning.
-- Portable backup/export including photos; collection rename/delete and sorting.
+- Collection rename/delete and sorting; photo storage management that respects recovery history.
 - Device testing of camera permission denial, large font sizes, rotation, and long collections.
 - Optional desktop interoperability and GESH sync after the standalone app is solid.
 - Norwegian strings, dark theme, and refinement against the design references.

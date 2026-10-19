@@ -48,6 +48,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
     var query by rememberSaveable { mutableStateOf("") }
     var newCollection by rememberSaveable { mutableStateOf(false) }
     var aboutOpen by rememberSaveable { mutableStateOf(false) }
+    var backupsOpen by rememberSaveable { mutableStateOf(false) }
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val collection = catalog.collections.find { it.id == collectionId }
@@ -70,17 +71,20 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
     LaunchedEffect(error, ready) {
         if (error != null && ready) { snack.showSnackbar(error!!); vm.clearError() }
     }
+    fun restoredBackup() { page = "home"; itemId = null; collectionId = null; query = "" }
     if (!ready) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(32.dp), Arrangement.Center, Alignment.CenterHorizontally) {
                 if (error == null) CircularProgressIndicator()
                 else {
-                    Text("Your collection is safe", style = MaterialTheme.typography.headlineMedium)
+                    Text("Couldn’t open your collection", style = MaterialTheme.typography.headlineMedium)
                     Spacer(Modifier.height(16.dp)); Text(error!!)
                     Button(onClick = { vm.load() }, modifier = Modifier.padding(top = 20.dp)) { Text("Retry") }
+                    TextButton(onClick = { backupsOpen = true }) { Text("Backups & recovery") }
                 }
             }
         }
+        if (backupsOpen) BackupsDialog(vm, ::restoredBackup) { backupsOpen = false }
         return
     }
     val editor = page == "edit"
@@ -125,7 +129,8 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
         }
     }
     if (newCollection) NewCollectionDialog(busy, catalog.collections.map { it.name }, { newCollection = false }) { name -> vm.addCollection(name) { newCollection = false; collectionReturn = page; collectionId = vm.catalog.value.collections.last().id; page = "collection"; query = "" } }
-    if (aboutOpen) AboutHodd { aboutOpen = false }
+    if (aboutOpen) AboutHodd({ aboutOpen = false; backupsOpen = true }) { aboutOpen = false }
+    if (backupsOpen) BackupsDialog(vm, ::restoredBackup) { backupsOpen = false }
 }
 
 @Composable

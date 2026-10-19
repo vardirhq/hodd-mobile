@@ -4,6 +4,22 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-10-19
+
+### Added
+- Backups & recovery in About Hodd, with portable ZIP exports containing the catalog and referenced cover photos.
+- Verified export readback, checksums, bounded archive validation, import preview and explicit replacement confirmation.
+- Up to 20 local catalog recovery copies, with retained photos and recovery access when the primary catalog cannot be opened.
+- Preservation of the previous catalog before replacement, including unreadable original bytes during explicit recovery.
+- Backup round-trip, corrupt archive, missing file, failed save, cancel/confirm and recovery tests.
+
+### Changed
+- Saves sync and verify their contents before updating the visible collection.
+- Data fixtures and APK replacement checks run only on disposable emulators.
+
+### Fixed
+- A missing primary catalog with recovery copies or stored photos no longer silently opens as a new empty collection.
+
 ## [0.1.0-alpha.1] - 2026-10-19
 
 ### Added

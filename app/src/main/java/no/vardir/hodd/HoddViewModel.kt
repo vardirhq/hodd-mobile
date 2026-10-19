@@ -16,6 +16,8 @@ import no.vardir.hodd.data.CatalogRepository
 class HoddViewModel(application: Application) : AndroidViewModel(application) {
     val repository = CatalogRepository(application)
     val catalog = repository.catalog
+    internal val recovery = repository.recovery
+    internal val backups = BackupActions(this)
     private val mutableReady = MutableStateFlow(false)
     val ready = mutableReady.asStateFlow()
     private val mutableError = MutableStateFlow<String?>(null)
@@ -25,10 +27,11 @@ class HoddViewModel(application: Application) : AndroidViewModel(application) {
     init { load() }
 
     fun load() = viewModelScope.launch {
-        try { repository.load(); mutableReady.value = true; mutableError.value = null }
+        try { repository.load(); mutableReady.value = true; mutableError.value = recovery.value.warning }
         catch (error: Exception) {
             if (error is CancellationException) throw error
-            mutableError.value = "Could not read your collection. Your saved file has been kept. Retry to open it."
+            mutableReady.value = false
+            mutableError.value = "The saved collection could not be read. Nothing has been replaced. Retry, restore a recovery copy, or import a backup."
         }
     }
 
@@ -47,6 +50,14 @@ class HoddViewModel(application: Application) : AndroidViewModel(application) {
     fun addCollection(name: String, onSaved: () -> Unit) = change(onSaved) { it.addCollection(name) }
     fun deleteItem(id: String, onSaved: () -> Unit) = change(onSaved) { it.removeItem(id) }
     fun loadExamples() = change { if (it.collections.isEmpty() && it.items.isEmpty()) exampleCatalog() else it }
+    internal fun beginBackup(): Boolean {
+        if (mutableBusy.value) return false
+        mutableBusy.value = true
+        return true
+    }
+    internal fun endBackup() { mutableBusy.value = false }
+    internal fun backupRestored() { mutableReady.value = true; mutableError.value = null }
+    override fun onCleared() { backups.close(); super.onCleared() }
     fun clearError() { mutableError.value = null }
     fun photo(uri: Uri, onSaved: (String?) -> Unit) = viewModelScope.launch {
         try { onSaved(repository.importPhoto(uri)) }

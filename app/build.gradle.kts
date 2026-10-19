@@ -24,7 +24,7 @@ android {
         targetSdk = 35
         versionCode = hoddVersionCode
         versionName = hoddVersionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "no.vardir.hodd.HoddTestRunner"
     }
     signingConfigs {
         if (hoddSigningReady) create("persistent") {
