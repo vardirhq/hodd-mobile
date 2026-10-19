@@ -10,6 +10,38 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProductLinkImporterTest {
+    @Test fun retryAfterStopsSameHostRequestsButNotOtherStores() {
+        var elapsed = 1000L
+        val limits = no.vardir.hodd.data.ProductLinkRateLimits(
+            now = { java.time.Instant.parse("2026-10-19T22:00:00Z") }, elapsed = { elapsed })
+        fun refusal(header: String?) = runCatching { limits.refused("SHOP.example", header) }.exceptionOrNull()!!
+        assertTrue(refusal("120").message!!.contains("120 seconds"))
+        assertTrue(runCatching { limits.check("shop.example") }.isFailure)
+        limits.check("another.example")
+        elapsed += 120000
+        limits.check("shop.example")
+        assertTrue(refusal("Mon, 19 Oct 2026 22:02:00 GMT").message!!.contains("120 seconds"))
+        elapsed += 120000
+        limits.check("shop.example")
+        assertTrue(refusal("bad value").message!!.contains("60 seconds"))
+        elapsed += 60000
+        limits.check("shop.example")
+        assertTrue(refusal("0").message!!.contains("1 seconds"))
+    }
+    @Test fun elkjopProductShapeKeepsConsumerAndBusinessPricesSeparate() {
+        val html = """<script type="application/ld+json">{"@type":"Product",
+          "@id":"https://www.elkjop.no/product/game/SWISUPERSMAB",
+          "name":"Super Smash Bros. Ultimate - SSBU (Switch)","sku":"SWISUPERSMAB",
+          "image":"https://next-media.elkjop.com/image/cover.jpg","brand":{"@type":"Brand","name":"Nintendo"},
+          "offers":[{"@type":"Offer","price":"619","priceCurrency":"NOK","eligibleCustomerType":{"@id":"https://schema.org/Public"}},
+          {"@type":"Offer","price":"495.2","priceCurrency":"NOK","eligibleCustomerType":{"@id":"https://schema.org/Business"}}]}</script>"""
+        val result = ProductLinkImporter.parse(html, "https://www.elkjop.no/product/game/SWISUPERSMAB?qid=tracking")
+        assertEquals("Super Smash Bros. Ultimate - SSBU (Switch)", result.title)
+        assertEquals("Nintendo", result.brand)
+        assertEquals("SWISUPERSMAB", result.sku)
+        assertEquals("https://next-media.elkjop.com/image/cover.jpg", result.imageUrl)
+        assertTrue(result.price.isBlank()) // Do not guess between consumer and ex-VAT business offers.
+    }
     @Test fun readsProductJsonLd() {
         val html = """
             <html><head><script type="application/ld+json">

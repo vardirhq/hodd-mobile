@@ -214,7 +214,9 @@ internal fun ItemEditor(
             Surface(shadowElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
                 Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && !fetchingProduct && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
                     if (busy || importing || assisting || fetchingProduct) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                    else { Icon(Icons.Outlined.Check, null); Spacer(Modifier.width(8.dp)); Text(if (existing == null) "Save to collection" else "Save changes") }
+                    else Icon(Icons.Outlined.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (existing == null) "Save to collection" else "Save changes")
                 }
             }
         },

@@ -68,6 +68,17 @@ class ProductLinkFlowTest {
         compose.onNodeWithText("Save changes").performClick()
         assertEquals("My title", saved!!.title); assertTrue(saved!!.attributes.isEmpty())
     }
+    @Test fun refusedStoreLeavesDraftEditableAndOffersBrowserFallback() {
+        val source = object : ProductLinkSource {
+            override suspend fun preview(url: String): List<ProductPreview> = error("The store is limiting requests (HTTP 429). Wait 60 seconds.")
+            override suspend fun prepareImage(url: String, target: File) = error("Not requested")
+        }
+        editor(item(), source)
+        compose.onNodeWithText("Open store in browser").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Save changes").assertIsEnabled().performClick()
+        assertEquals("My title", saved!!.title)
+        assertTrue(saved!!.attributes.isEmpty())
+    }
     @Test fun applyingSelectedMetadataPreservesUserEditsAndCatalogSourceAndSkipsImageByDefault() {
         val original = item().copy(publisher = "My publisher", notes = "My notes", metadataSource = "Wikidata", metadataUrl = "https://www.wikidata.org/wiki/Q1")
         editor(original, source(listOf(preview())))

@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
@@ -34,6 +35,8 @@ internal fun ProductLinkPanel(
     apply: (ItemSuggestion, String?) -> Unit, working: (Boolean) -> Unit, message: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    var failure by remember { mutableStateOf<String?>(null) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var url by rememberSaveable { mutableStateOf("") }
     var candidates by remember { mutableStateOf(emptyList<ProductPreview>()) }
@@ -54,12 +57,13 @@ internal fun ProductLinkPanel(
     fun request(label: String, action: suspend () -> Unit) {
         if (running) return
         val id = ++requestId
-        running = true; progress = label; currentWorking(true)
+        failure = null; running = true; progress = label; currentWorking(true)
         job = scope.launch {
             try { action() }
             catch (error: Exception) {
                 if (error is CancellationException) throw error
-                message("${error.message ?: "Could not complete this import."} Your saved item is unchanged.")
+                failure = error.message ?: "Could not complete this import."
+                message("$failure Your saved item is unchanged.")
             } finally { if (requestId == id) { running = false; currentWorking(false); job = null } }
         }
     }
@@ -85,7 +89,7 @@ internal fun ProductLinkPanel(
             TextButton(onClick = { expanded = !expanded }, enabled = enabled && !running, contentPadding = PaddingValues(0.dp)) { Text("Import from a store") }
             if (expanded) {
                 Text("Read a public product page on this device. The store receives your request; photos and collection data are not uploaded.", style = MaterialTheme.typography.bodySmall, color = Muted)
-                OutlinedTextField(url, { url = it.take(2000) }, label = { Text("Product page URL") }, singleLine = true,
+                OutlinedTextField(url, { url = it.take(2000); failure = null }, label = { Text("Product page URL") }, singleLine = true,
                     enabled = enabled && !running, modifier = Modifier.fillMaxWidth())
                 Button(onClick = {
                     request("Reading product details…") {
@@ -96,6 +100,14 @@ internal fun ProductLinkPanel(
                         selected = found.singleOrNull()
                     }
                 }, enabled = enabled && !running && url.trim().startsWith("https://", true)) { Text("Fetch product details") }
+            }
+            failure?.let { error ->
+                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text("You can open the store in your browser, then return to enter details or add a photo. Hodd cannot bypass store restrictions.", style = MaterialTheme.typography.bodySmall)
+                val browserUrl = runCatching { java.net.URI(url.trim()).takeIf { it.scheme.equals("https", true) && !it.host.isNullOrBlank() && it.userInfo == null } }.getOrNull()
+                if (browserUrl != null) TextButton(onClick = {
+                    runCatching { uriHandler.openUri(browserUrl.toString()) }.onFailure { message("No browser could open this link.") }
+                }) { Text("Open store in browser") }
             }
             if (running) {
                 LinearProgressIndicator(Modifier.fillMaxWidth()); Text(progress)

@@ -40,6 +40,7 @@ interface ProductLinkSource {
 
 /** Public product metadata is fetched locally. No AI service or account is involved. */
 object ProductLinkImporter : ProductLinkSource {
+    private val rateLimits = ProductLinkRateLimits()
     private const val MAX_HTML = 2_000_000
     private const val MAX_IMAGE = 8_000_000
     private fun validatedUrl(raw: String): URL {
@@ -64,12 +65,19 @@ object ProductLinkImporter : ProductLinkSource {
         repeat(5) {
             coroutineContext.ensureActive()
             require(android.os.SystemClock.elapsedRealtime() < deadline) { "The store took too long to respond." }
+            rateLimits.check(url.host)
             val connection = url.openConnection() as HttpURLConnection
             try {
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 8000; connection.readTimeout = 10000
                 connection.setRequestProperty("User-Agent", "HoddMobile/0.1 (https://github.com/vardirhq/hodd-mobile)")
+                connection.setRequestProperty("Accept", if (image) "image/jpeg,image/png,image/webp" else "text/html,application/xhtml+xml")
                 connection.connect()
+                val status = connection.responseCode
+                if (status == 429 || (status == 503 && connection.getHeaderField("Retry-After") != null)) {
+                    rateLimits.refused(url.host, connection.getHeaderField("Retry-After"), status)
+                }
+                require(status != 403) { "The store refused access (HTTP 403). Open it in your browser or add details manually." }
                 if (connection.responseCode in listOf(301, 302, 303, 307, 308)) {
                     url = validatedUrl(URL(url, connection.getHeaderField("Location") ?: error("Invalid redirect.")).toString())
                 } else {

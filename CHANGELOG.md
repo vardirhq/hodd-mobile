@@ -12,6 +12,7 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 - Optional bounded image preview followed by the existing photo editor; existing covers are retained when adding a store image.
 
 ### Fixed
+- Explain store refusals and respect HTTP 429/Retry-After cooldowns without automatic retries; offer a browser/manual fallback.
 - Store requests block competing save/photo actions and support cancellation without late application or leftover staged images.
 - ImageObject URLs and linked JSON-LD references are resolved; descriptions are converted to plain text and aggregate prices are labeled.
 - Existing user edits and catalog provenance survive product imports.
