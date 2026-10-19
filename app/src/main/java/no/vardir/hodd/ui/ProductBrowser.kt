@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,7 +52,7 @@ internal fun ProductBrowser(
     fun navigate(view: WebView, url: String) {
         val generation = ++lifetime.generation
         ready = false; loading = true; error = null; location = url
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             try {
                 require(ProductBrowserMetadata.isPublicHttps(url)) { "Only public HTTPS pages can be opened here." }
                 withContext(Dispatchers.IO) { validate(url) }
@@ -69,7 +70,7 @@ internal fun ProductBrowser(
         reading = true; error = null
         view.evaluateJavascript(ProductBrowserMetadata.script) { raw ->
             if (!lifetime.alive || generation != lifetime.generation || view.url != pageUrl) { reading = false; return@evaluateJavascript }
-            scope.launch {
+            scope.launch(Dispatchers.Main.immediate) {
                 try {
                     val found = withContext(Dispatchers.IO) {
                         ProductLinkImporter.parseBrowserSnapshot(ProductBrowserMetadata.decodeJavascriptResult(raw), pageUrl)
@@ -100,7 +101,7 @@ internal fun ProductBrowser(
                 Text("Load the product, then import its details for review. This browser uses its own store cookies; your collection stays private.",
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp))
                 if (loading || reading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                AndroidView(modifier = Modifier.weight(1f).fillMaxWidth().testTag("store-webview"), factory = { context ->
+                AndroidView(modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("store-webview"), factory = { context ->
                     WebView(context).apply {
                         browser = this
                         settings.javaScriptEnabled = true
