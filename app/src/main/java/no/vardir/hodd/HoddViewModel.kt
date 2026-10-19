@@ -49,6 +49,8 @@ class HoddViewModel(application: Application) : AndroidViewModel(application) {
     fun save(item: CatalogItem, onSaved: () -> Unit) = change(onSaved) { it.save(item) }
     fun addCollection(name: String, onSaved: () -> Unit) = change(onSaved) { it.addCollection(name) }
     fun deleteItem(id: String, onSaved: () -> Unit) = change(onSaved) { it.removeItem(id) }
+    fun addSavedView(name: String, collectionId: String?, tag: String, location: String, status: no.vardir.hodd.core.ItemStatus?, onSaved: () -> Unit) = change(onSaved) { it.addSavedView(name, collectionId, tag, location, status) }
+    fun removeSavedView(id: String, onSaved: () -> Unit = {}) = change(onSaved) { it.removeSavedView(id) }
     fun loadExamples() = change { if (it.collections.isEmpty() && it.items.isEmpty()) exampleCatalog() else it }
     internal fun beginBackup(): Boolean {
         if (mutableBusy.value) return false
