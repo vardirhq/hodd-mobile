@@ -4,6 +4,13 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7] - 2026-10-19
+
+### Fixed
+- Prevent photo-editor crashes caused by recycling preview bitmaps before Compose finishes drawing.
+- Normalize gallery imports to bounded JPEG images with corrected orientation.
+- Preserve automatic Android build numbers while advancing the visible alpha version.
+
 ## [0.1.0-alpha.6] - 2026-10-19
 
 ### Added
