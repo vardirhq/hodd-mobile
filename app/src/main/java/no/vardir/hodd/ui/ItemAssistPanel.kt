@@ -17,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.ItemSuggestion
+import no.vardir.hodd.core.FieldChoices
 import no.vardir.hodd.data.LocalAiStatus
 import no.vardir.hodd.data.LocalItemAssistant
 import no.vardir.hodd.data.MetadataRepository
@@ -42,6 +43,11 @@ internal fun ItemAssistPanel(
     var suggestions by remember { mutableStateOf(emptyList<ItemSuggestion>()) }
     var notice by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<ItemSuggestion?>(null) }
+    var recognizedText by rememberSaveable { mutableStateOf("") }
+    var editCoverText by rememberSaveable { mutableStateOf(false) }
+    var reviewTitle by remember { mutableStateOf("") }
+    var reviewCreator by remember { mutableStateOf("") }
+    var reviewKind by remember { mutableStateOf("") }
     var replace by remember { mutableStateOf(false) }
     var downloadCover by remember { mutableStateOf(false) }
     var confirmDownload by remember { mutableStateOf(false) }
@@ -87,7 +93,9 @@ internal fun ItemAssistPanel(
                 OutlinedButton(onClick = {
                     task("Reading cover on-device…") {
                         val result = local.readCover(requireNotNull(cover), draft.kind)
-                        notice = result.notice; suggestions = result.items; status = local.status()
+                        notice = result.notice; suggestions = result.items; recognizedText = result.recognizedText
+                        if (result.items.isEmpty()) { editCoverText = recognizedText.isNotBlank(); message(result.notice) }
+                        status = local.status()
                     }
                 }, enabled = enabled && !running && cover != null, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.DocumentScanner, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Read cover")
@@ -96,21 +104,10 @@ internal fun ItemAssistPanel(
                     OutlinedButton(onClick = {
                         task("Identifying cover and finding catalog matches…") {
                             val recognized = local.readCover(cover, draft.kind)
-                            val identity = recognized.items.firstOrNull()
-                            if (identity == null) {
-                                notice = recognized.notice; suggestions = recognized.items
-                            } else {
-                                val matches = try {
-                                    metadata.lookup(draft.kind, "", identity.title, identity.creator)
-                                } catch (error: Exception) {
-                                    if (error is CancellationException) throw error
-                                    emptyList()
-                                }
-                                suggestions = if (matches.isEmpty()) recognized.items else matches
-                                notice = if (matches.isEmpty())
-                                    "No catalog match found. Review the on-device identification instead."
-                                else "Catalog matches based on the cover title and creator. Check the edition before applying."
-                            }
+                            recognizedText = recognized.recognizedText
+                            notice = "${recognized.notice} Review the title, creator and type before choosing Find catalog matches. No search has been sent."
+                            suggestions = recognized.items
+                            if (suggestions.isEmpty()) { editCoverText = recognizedText.isNotBlank(); message(recognized.notice) }
                             status = local.status()
                         }
                     }, enabled = enabled && !running, modifier = Modifier.fillMaxWidth()) {
@@ -118,14 +115,16 @@ internal fun ItemAssistPanel(
                         Spacer(Modifier.width(8.dp))
                         Text("Identify and find online")
                     }
-                    Text("Sends the recognized title and creator to the metadata provider, never your photo.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("Review and edit recognition before sending a title/creator search. Your photo stays on-device.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
+                if (recognizedText.isNotBlank()) TextButton(onClick = { editCoverText = true }, enabled = !running) { Text("View cover text") }
                 if (cover == null) Text("Take or choose a cover photo above to read its text.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 OutlinedTextField(description, { description = it.take(3000) }, label = { Text("Describe your item") },
                     placeholder = { Text("The Hobbit paperback, lent to Martin") }, enabled = enabled && !running,
                     modifier = Modifier.fillMaxWidth(), minLines = 2)
                 TextButton(onClick = {
                     task("Preparing suggestions with local AI…") {
+                        recognizedText = ""
                         suggestions = listOf(local.describe(description, draft.kind))
                         notice = "Suggested by on-device AI. Check the title, creator, edition and ownership details. Nothing has been saved."
                     }
@@ -137,7 +136,7 @@ internal fun ItemAssistPanel(
                     task("Finding matching items…") {
                         val matches = metadata.lookup(draft.kind, draft.barcode, draft.title, draft.creator)
                         if (matches.isEmpty()) message("No matching items found. Try a title search or enter details manually.")
-                        else { suggestions = matches; notice = "Choose a match, then review its details. Edition and cover availability can vary." }
+                        else { recognizedText = ""; suggestions = matches; notice = "Choose a match, then review its details. Edition and cover availability can vary." }
                     }
                 }, enabled = enabled && !running && draft.kind in listOf("Book", "Comic", "Vinyl", "CD") && (draft.barcode.isNotBlank() || draft.title.isNotBlank()), modifier = Modifier.fillMaxWidth()) { Text("Find online") }
                 if (draft.kind !in listOf("Book", "Comic", "Vinyl", "CD")) Text("Online lookup is available for books and music. Local cover recognition works for every type.", style = MaterialTheme.typography.bodySmall, color = Muted)
@@ -155,8 +154,9 @@ internal fun ItemAssistPanel(
         text = {
             Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(notice, style = MaterialTheme.typography.bodySmall)
+                if (recognizedText.isNotBlank()) TextButton(onClick = { suggestions = emptyList(); editCoverText = true }) { Text("Review recognized text") }
                 suggestions.forEach { item ->
-                    OutlinedCard(onClick = { selected = item; replace = false; downloadCover = item.coverUrl.isNotBlank() && cover == null }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedCard(onClick = { selected = item; reviewTitle = item.title; reviewCreator = item.creator; reviewKind = item.kind.ifBlank { draft.kind }; replace = false; downloadCover = item.coverUrl.isNotBlank() && cover == null }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(item.title, style = MaterialTheme.typography.titleMedium)
                             if (item.creator.isNotBlank()) Text(item.creator)
@@ -172,12 +172,28 @@ internal fun ItemAssistPanel(
         onDismissRequest = { if (!running) selected = null }, title = { Text("Review details") },
         text = {
             Column(Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(item.title, style = MaterialTheme.typography.titleLarge)
-                listOf("Creator" to item.creator, "Type" to item.kind, "Format" to item.format, "Barcode" to item.barcode,
+                OutlinedTextField(reviewTitle, { reviewTitle = it.take(300) }, label = { Text("Suggested title") }, enabled = !running,
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(reviewCreator, { reviewCreator = it.take(300) }, label = { Text("Suggested creator") }, enabled = !running,
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                SearchableChoice("review-kind", "Suggested type", reviewKind, FieldChoices.kinds, enabled = !running, optional = false, custom = false) { reviewKind = it }
+                listOf("Format" to item.format, "Barcode" to item.barcode,
                     "Status" to item.status, "Lent to" to item.lentTo, "Notes" to item.notes,
                     "Subtitle" to item.subtitle, "Series" to item.series, "Volume" to item.volume,
                     "Publisher" to item.publisher, "Language" to item.language, "Release year" to item.releaseYear,
                     "Condition" to item.condition).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
+                item.attributes.filterValues { it.isNotBlank() }.forEach { (key, value) ->
+                    Text("${key.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() }}: $value")
+                }
+                if (reviewKind in listOf("Book", "Comic", "Vinyl", "CD") && item.source !in listOf("Open Library", "MusicBrainz")) {
+                    OutlinedButton(onClick = {
+                        task("Finding catalog matches for the reviewed title…") {
+                            val matches = metadata.lookup(reviewKind, "", reviewTitle.trim(), reviewCreator.trim())
+                            if (matches.isEmpty()) message("No catalog matches. You can correct the title or apply the reviewed details.")
+                            else { selected = null; suggestions = matches; notice = "Matches for your reviewed search. Check the edition before applying." }
+                        }
+                    }, enabled = !running && reviewTitle.isNotBlank()) { Text("Find catalog matches") }
+                }
                 Text("Source: ${item.source}", style = MaterialTheme.typography.bodySmall, color = Violet)
                 if (item.detail.isNotBlank()) Text(item.detail, style = MaterialTheme.typography.bodySmall)
                 Text("Empty fields are filled by default. Existing details and your photo are kept.", style = MaterialTheme.typography.bodySmall)
@@ -203,13 +219,29 @@ internal fun ItemAssistPanel(
                     try { coverName = metadata.importCover(item) }
                     catch (error: Exception) { if (error is CancellationException) throw error; coverFailed = true }
                 }
-                apply(item, replace, coverName)
+                apply(item.copy(title = reviewTitle.trim(), creator = reviewCreator.trim(), kind = reviewKind), replace, coverName)
                 selected = null; suggestions = emptyList()
                 message(if (coverFailed) "Details applied. Artwork was unavailable; your existing cover is kept." else "Suggestion applied. Review the form, then save.")
             }
-        }, enabled = !running) { Text("Use details") } },
+        }, enabled = !running && reviewTitle.isNotBlank()) { Text("Use details") } },
         dismissButton = { TextButton(onClick = { selected = null }, enabled = !running) { Text("Back") } },
     ) }
+    if (editCoverText) AlertDialog(onDismissRequest = { if (!running) editCoverText = false },
+        title = { Text("Review recognized text") },
+        text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("OCR can misread stylized lettering. Correct it here or use a closer cover photo. This stays on-device.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(recognizedText, { recognizedText = it.take(3000) }, label = { Text("Cover text") }, enabled = !running,
+                modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 8)
+            if (running) LinearProgressIndicator(Modifier.fillMaxWidth())
+        } },
+        confirmButton = { TextButton(onClick = {
+            task("Reading the corrected cover text…") {
+                val result = local.readCoverText(recognizedText, draft.kind)
+                suggestions = result.items; notice = result.notice
+                if (suggestions.isNotEmpty()) editCoverText = false else message("No title found. Keep the work title on its own line, or try another cover photo.")
+            }
+        }, enabled = !running && recognizedText.isNotBlank()) { Text("Use corrected text") } },
+        dismissButton = { TextButton(onClick = { editCoverText = false }, enabled = !running) { Text("Cancel") } })
     if (confirmDownload) AlertDialog(onDismissRequest = { confirmDownload = false }, title = { Text("Download local AI?") },
         text = { Text("Android will download the Gemini Nano model needed for on-device suggestions. This can be a large download; Wi-Fi is recommended. Hodd never sends your items to cloud AI. Cover text recognition works without this download.") },
         confirmButton = { TextButton(onClick = {

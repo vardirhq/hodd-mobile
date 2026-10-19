@@ -114,13 +114,89 @@ class ItemAssistanceTest {
         val model = StubModel(LocalAiStatus.AVAILABLE)
         val assistant = LocalItemAssistant(context, model)
         try {
-            assertEquals("On-device AI", assistant.readCover(file, "Book").items.single().source)
+            assertEquals("On-device AI", assistant.readCover(file, "Book").items.first().source)
             assertEquals(1, model.calls)
             model.fail = true
             val fallback = assistant.readCover(file, "Book")
             assertTrue(fallback.items.any { it.title.contains("HOBBIT", ignoreCase = true) })
-            assertTrue(fallback.notice.contains("could not finish"))
+            assertTrue(fallback.notice.contains("could not produce"))
         } finally { assistant.close(); file.delete() }
+    }
+
+    @Test fun imageInputIsPreferredWhenTheLocalAdapterSupportsIt() = runBlocking {
+        val file = coverPhoto()
+        var images = 0
+        var textCalls = 0
+        val model = object : LocalTextModel {
+            override suspend fun status() = LocalAiStatus.AVAILABLE
+            override suspend fun download(progress: (Long) -> Unit) = Unit
+            override suspend fun suggest(text: String, kind: String, description: Boolean): ItemSuggestion { textCalls++; error("Should prefer the image") }
+            override suspend fun suggestCover(image: Bitmap, text: String, kind: String): ItemSuggestion {
+                images++; assertFalse(image.isRecycled); assertTrue(image.width > 0); assertTrue(text.contains("HOBBIT", true))
+                return ItemSuggestion("The Hobbit", "J. R. R. Tolkien", "Book", source = "On-device AI")
+            }
+            override fun close() = Unit
+        }
+        val assistant = LocalItemAssistant(context, model)
+        try {
+            val result = assistant.readCover(file, "Book")
+            assertEquals("The Hobbit", result.items.first().title)
+            assertEquals(1, images); assertEquals(0, textCalls)
+            assertTrue(result.notice.contains("cover image"))
+            assertTrue(result.recognizedText.contains("HOBBIT", true))
+        } finally { assistant.close(); file.delete() }
+    }
+
+    @Test fun brandingAsTitleIsRejectedInsteadOfBeingPresentedAsAnIdentification() = runBlocking {
+        val model = object : LocalTextModel {
+            override suspend fun status() = LocalAiStatus.AVAILABLE
+            override suspend fun download(progress: (Long) -> Unit) = Unit
+            override suspend fun suggest(text: String, kind: String, description: Boolean) = ItemSuggestion("MLMENDO SWITCH", "SUPER AR ODYSSTK", source = "On-device AI")
+            override fun close() = Unit
+        }
+        val assistant = LocalItemAssistant(context, model)
+        try {
+            val result = assistant.readCoverText("MLMENDO SWITCH\nSUPER AR ODYSSTK", "Book")
+            assertEquals("SUPER AR ODYSSTK", result.items.single().title)
+            assertEquals("", result.items.single().creator)
+            assertEquals("Game", result.items.single().kind)
+            assertEquals("On-device text recognition", result.items.single().source)
+            assertTrue(result.notice.contains("could not produce a reliable"))
+            val brandingOnly = assistant.readCoverText("Nintendo Switch", "Game")
+            assertTrue(brandingOnly.items.isEmpty()); assertEquals("Nintendo Switch", brandingOnly.recognizedText)
+        } finally { assistant.close() }
+    }
+
+    @Test fun coverTextCanBeCorrectedAndReviewedWithoutApplyingUntilConfirmation() {
+        val file = coverPhoto(); val assistant = LocalItemAssistant(context, StubModel(LocalAiStatus.UNAVAILABLE))
+        var applied: ItemSuggestion? = null
+        compose.setContent { HoddTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            ItemAssistPanel(CatalogItem(collectionId = "shelf", title = "", kind = "Book"), file, true,
+                apply = { suggestion, _, _ -> applied = suggestion }, working = {}, message = {}, assistant = assistant)
+        } } }
+        compose.onNodeWithText("Find and fill details").performClick()
+        compose.onNodeWithText("Read cover").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Review recognized text").performClick()
+        compose.onNodeWithText("Cover text").performTextReplacement("NINTENDO SWITCH\nSUPER MARIO ODYSSEY")
+        compose.onNodeWithText("Use corrected text").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("SUPER MARIO ODYSSEY").fetchSemanticsNodes().isNotEmpty() }
+        assertNull(applied)
+        compose.onNodeWithText("SUPER MARIO ODYSSEY").performClick()
+        compose.onNodeWithText("Suggested title").performTextReplacement("Super Mario Odyssey")
+        compose.onNodeWithTag("choice-review-kind").assertTextContains("Game")
+        val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(directory, "17-cover-review.png").outputStream().use {
+            compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        assertNull(applied)
+        compose.onNodeWithText("Use details").performClick()
+        compose.waitUntil(5000) { applied != null }
+        assertEquals("Super Mario Odyssey", applied!!.title)
+        assertEquals("Game", applied!!.kind)
+        assertEquals("Nintendo Switch", applied!!.attributes["platform"])
+        assertEquals("", applied!!.creator)
+        file.delete()
     }
 
     private fun coverPhoto(): File {

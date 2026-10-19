@@ -2,7 +2,7 @@
 
 A native Android home for the things you collect. Built with Kotlin and Jetpack Compose, inspired by [Hodd for desktop](https://github.com/vardirhq/hodd).
 
-**Early development · 0.1.0-alpha.3** — the initial offline collection flows are implemented. This is not a production release.
+**Early development · 0.1.0-alpha.4** — the initial offline collection flows are implemented. This is not a production release.
 
 ## What you can do
 
@@ -27,7 +27,7 @@ Covers without photos are generated locally from the title and type. Example dat
 
 ## Build
 
-Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Compose compiler 2.1.20, AGP 8.7.3 and Gradle 8.11.1 are pinned. The optional ML Kit Prompt integration is pinned to 1.0.0-alpha1; its availability and behavior depend on the device and AICore.
+Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Compose compiler 2.1.20, AGP 8.7.3 and Gradle 8.11.1 are pinned. The optional ML Kit Prompt integration is pinned to 1.0.0-beta4; its availability and behavior depend on the device and AICore.
 
 ```sh
 ./gradlew :core:test :app:assembleDebug :app:lintDebug
@@ -60,7 +60,7 @@ Photos are copied into app-private storage. Camera access is used only for captu
 
 ## Local assistance and online metadata
 
-**Read cover** runs bundled Latin-script ML Kit OCR on the device, including offline. If Gemini Nano is ready, Hodd prefers it to structure the recognized text; if it fails or is unavailable, you can choose a recognized line as the title. Missing author/edition information is not inferred by the OCR fallback. **Suggest from description** requires an available local model. AI output is untrusted, bounded and validated, and always reviewed; it can still be wrong.
+**Read cover** runs bundled Latin-script ML Kit OCR on the device, including offline. If Gemini Nano is ready, Hodd first tries the cover image plus OCR hints, then category-aware text structuring if image input fails. Text-only outputs are checked against cover text, and platform headers are separated from title candidates. Raw text alternatives remain available, and you can correct OCR plus the proposed title/creator/type before applying or searching online. Image interpretation can still be wrong and depends on supported hardware/AICore. Missing author/edition information is not inferred by the OCR fallback. **Suggest from description** requires an available local model. AI output is untrusted, bounded and validated, and always reviewed; it can still be wrong.
 
 Hodd checks Gemini Nano availability at runtime. AICore/device/model support varies, and Google Play/AICore initialization may be necessary. Where supported but not downloaded, **Set up local AI** offers an explicit model download. There is no cloud AI fallback, API key or AI subscription. Actual Nano generation still needs testing on supported physical hardware; emulator tests use a controlled model adapter to verify preference and failure handling.
 

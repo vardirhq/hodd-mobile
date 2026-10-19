@@ -69,7 +69,12 @@ object SuggestionCodec {
         val status = field("status").takeIf { it in listOf("OWNED", "WANTED", "LENT") && (it != "LENT" || borrower.isNotBlank()) }.orEmpty()
         return ItemSuggestion(title, field("creator"), kind, field("format"), barcode, field("notes", 2000), status, borrower, source = "On-device AI",
             subtitle = field("subtitle"), series = field("series"), volume = field("volume"), publisher = field("publisher"),
-            language = field("language"), releaseYear = field("releaseYear"), condition = field("condition"))
+            language = field("language"), releaseYear = field("releaseYear"), condition = field("condition"),
+            attributes = (obj["attributes"] as? JsonObject)?.entries?.take(24)?.mapNotNull { (key, value) ->
+                val primitive = value as? JsonPrimitive
+                val content = primitive?.takeIf { it.isString }?.contentOrNull?.trim().orEmpty()
+                if (key.matches(Regex("[a-zA-Z][a-zA-Z0-9]{0,39}")) && content.length in 1..300) key to content else null
+            }?.toMap().orEmpty())
     }
 }
 

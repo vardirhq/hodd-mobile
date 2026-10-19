@@ -4,6 +4,20 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] - 2026-10-19
+
+### Changed
+- Cover identification first tries image plus OCR input through the local model, with text/OCR fallback when unsupported or unsuccessful.
+- Updated the optional ML Kit Prompt integration to 1.0.0-beta4 and made cover prompts category-aware.
+- Cover results retain raw text alternatives; recognized text, suggested title, creator and type can be reviewed/corrected before applying.
+- Cover-to-catalog lookup now requires reviewing the search identity before sending it online.
+
+### Fixed
+- Platform branding is rejected as a work title, including some damaged header text.
+- Game title lines are no longer accepted as creators without supporting credit/company evidence.
+- Unsupported facts from text-only cover suggestions are removed; cover recognition cannot infer ownership or condition.
+- Raw model responses are no longer included in recognition diagnostics.
+
 ## [0.1.0-alpha.3] - 2026-10-19
 
 ### Added
