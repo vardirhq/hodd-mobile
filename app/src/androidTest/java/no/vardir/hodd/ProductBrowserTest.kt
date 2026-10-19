@@ -1,9 +1,12 @@
 package no.vardir.hodd
 
 import android.graphics.Bitmap
+import android.webkit.WebView
+import android.webkit.WebResourceResponse
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.ByteArrayInputStream
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import no.vardir.hodd.data.ProductBrowserMetadata
@@ -17,17 +20,23 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@androidx.test.filters.SdkSuppress(minSdkVersion = 30)
 class ProductBrowserTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val url = "https://shop.example/item"
-    private var result: List<ProductPreview>? = null
-    private var closed = false
+    @Volatile private var result: List<ProductPreview>? = null
+    @Volatile private var closed = false
+    private lateinit var pageView: WebView
     private fun open(html: String) {
         compose.setContent { HoddTheme {
             var visible by remember { mutableStateOf(true) }
             if (visible) ProductBrowser(url, close = { closed = true; visible = false }, imported = { result = it; visible = false },
                 validate = { require(ProductBrowserMetadata.isPublicHttps(it)) },
-                load = { view, address -> view.loadDataWithBaseURL(address, html, "text/html", "UTF-8", address) })
+                intercept = { view, request ->
+                    pageView = view
+                    val body = if (request.url.toString() == url) html else ""
+                    WebResourceResponse("text/html", "UTF-8", ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)))
+                })
         } }
         compose.waitUntil(15000) { compose.onAllNodesWithText("Import this product").fetchSemanticsNodes().any { !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled) } }
     }
@@ -38,9 +47,17 @@ class ProductBrowserTest {
               node.textContent=JSON.stringify({'@type':'Product',name:'Rendered game',brand:{name:'Nintendo'},image:'/cover.jpg',offers:{price:'599',priceCurrency:'NOK'}});
               document.head.appendChild(node);
             });</script></head><body><h1>Rendered game</h1></body></html>""")
+        val button = compose.onNodeWithTag("store-browser-import").assertIsDisplayed().assertIsEnabled().fetchSemanticsNode()
+        compose.runOnIdle {
+            val metrics = compose.activity.windowManager.currentWindowMetrics
+            val bars = metrics.windowInsets.getInsets(android.view.WindowInsets.Type.navigationBars())
+            assertTrue("This regression must run with visible Android navigation controls", bars.bottom > 0)
+            val origin = IntArray(2); pageView.rootView.getLocationOnScreen(origin)
+            assertTrue("Import button must sit above Android navigation", button.boundsInWindow.bottom + origin[1] <= metrics.bounds.bottom - bars.bottom)
+        }
         val folder = File(compose.activity.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(folder, "23-store-browser.png").outputStream().use {
-            compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         compose.onNodeWithText("Import this product").performClick()
         compose.waitUntil(10000) { result != null }

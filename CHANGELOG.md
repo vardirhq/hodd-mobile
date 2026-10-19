@@ -11,6 +11,7 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 - Import this product reads bounded metadata from the displayed page into the existing product/field review; no server is required.
 
 ### Fixed
+- Keep the store browser import button above Android navigation controls using native dialog/window geometry when Compose insets are consumed.
 - Browser challenge pages without product metadata do not become item suggestions.
 - Browser cancellation and navigation invalidate pending extraction; file/content access, mixed content and native JavaScript bridges are disabled.
 

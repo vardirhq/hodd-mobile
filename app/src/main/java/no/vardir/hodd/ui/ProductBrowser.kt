@@ -29,7 +29,7 @@ import java.io.ByteArrayInputStream
 internal fun ProductBrowser(
     initialUrl: String, close: () -> Unit, imported: (List<ProductPreview>) -> Unit,
     validate: suspend (String) -> Unit = { ProductLinkImporter.validatedUrl(it); Unit },
-    load: (WebView, String) -> Unit = { view, url -> view.loadUrl(url) },
+    intercept: ((WebView, WebResourceRequest) -> WebResourceResponse)? = null,
 ) {
     val available = remember { runCatching { WebView.getCurrentWebViewPackage() != null }.getOrDefault(false) }
     if (!available) {
@@ -55,7 +55,7 @@ internal fun ProductBrowser(
             try {
                 require(ProductBrowserMetadata.isPublicHttps(url)) { "Only public HTTPS pages can be opened here." }
                 withContext(Dispatchers.IO) { validate(url) }
-                if (lifetime.alive && lifetime.generation == generation) load(view, url)
+                if (lifetime.alive && lifetime.generation == generation) view.loadUrl(url)
             } catch (failure: Exception) {
                 if (failure is CancellationException) throw failure
                 if (lifetime.alive && lifetime.generation == generation) { error = failure.message; loading = false }
@@ -90,7 +90,7 @@ internal fun ProductBrowser(
     }
     Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+            Column(Modifier.fillMaxSize().padding(dialogSafePadding())) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = close) { Text("Close browser") }
                     TextButton(onClick = { browser?.let { navigate(it, location) } }, enabled = !loading && !reading) { Text("Reload") }
@@ -122,6 +122,7 @@ internal fun ProductBrowser(
                                 return true
                             }
                             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                                if (intercept != null) return intercept(view, request)
                                 // Runs off the UI thread. Validate subresources too; never access app files/content URIs.
                                 return if (runCatching { ProductLinkImporter.validatedUrl(request.url.toString()) }.isSuccess) null
                                 else WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
@@ -154,7 +155,7 @@ internal fun ProductBrowser(
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
                 Button(onClick = ::readPage, enabled = ready && !loading && !reading,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 52.dp)) {
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 52.dp).testTag("store-browser-import")) {
                     Text(if (reading) "Reading product details…" else "Import this product")
                 }
             }
