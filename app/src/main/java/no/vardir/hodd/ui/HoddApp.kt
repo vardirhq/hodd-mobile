@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -150,10 +151,10 @@ private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Uni
             val featured = catalog.collections.first()
             val collectionItems = catalog.search(collectionId = featured.id)
             item {
-                Column(Modifier.fillMaxWidth().clickable { openCollection(featured) }) {
-                    Shelf(collectionItems.take(3), photo)
+                Column(Modifier.fillMaxWidth()) {
+                    Shelf(collectionItems, photo, openItem)
                     Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clickable { openCollection(featured) }, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(featured.name, style = MaterialTheme.typography.headlineMedium)
                             val counts = catalog.counts(featured.id)
@@ -253,13 +254,51 @@ internal fun Cover(item: CatalogItem, photo: File?, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun Shelf(items: List<CatalogItem>, photo: (String?) -> File?) {
-    Box(Modifier.fillMaxWidth().height(235.dp).background(Brush.verticalGradient(listOf(Color(0xFFF0E8DA), Color(0xFFE6D6BD))), RoundedCornerShape(20.dp)), contentAlignment = Alignment.BottomCenter) {
-        Row(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 27.dp).fillMaxWidth().height(180.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Bottom) {
-            items.forEach { item -> Cover(item, photo(item.photoName), Modifier.weight(1f).fillMaxHeight()) }
-            if (items.isEmpty()) Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) { Icon(ShelfIcon, null, tint = Color(0xFF9A896F), modifier = Modifier.size(48.dp)); Text("Room for your first find", color = Muted) }
+private fun Shelf(items: List<CatalogItem>, photo: (String?) -> File?, open: (CatalogItem) -> Unit) {
+    // Fixed height, flexible width: cover artwork is never cropped to fill a slot.
+    Box(
+        Modifier.fillMaxWidth().height(222.dp)
+            .background(Color(0xFFF3EFE8), RoundedCornerShape(20.dp)),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        if (items.isEmpty()) {
+            Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
+                Icon(ShelfIcon, null, tint = Color(0xFF9A896F), modifier = Modifier.size(48.dp))
+                Text("Room for your first find", color = Muted)
+            }
+        } else {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 17.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                items(items, key = { it.id }) { item ->
+                    Surface(
+                        modifier = Modifier.width(112.dp).height(176.dp).clickable { open(item) },
+                        shape = RoundedCornerShape(7.dp),
+                        color = Color.White,
+                        shadowElevation = 3.dp,
+                    ) {
+                        if (photo(item.photoName)?.exists() == true) {
+                            AsyncImage(
+                                model = photo(item.photoName),
+                                contentDescription = "Open ${item.title}",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Cover(item, null, Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
         }
-        Box(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 10.dp).background(Color(0xFFC8A67B), RoundedCornerShape(4.dp)))
+        // Slim, understated lip instead of the thick faux-wood block.
+        Box(
+            Modifier.fillMaxWidth().height(9.dp).padding(horizontal = 8.dp)
+                .background(Color(0xFFCBB79B), RoundedCornerShape(3.dp)),
+        )
     }
 }
 
