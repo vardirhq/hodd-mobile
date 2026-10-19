@@ -23,6 +23,8 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       - name: Validate version and changelog
         run: |
           python3 scripts/release_metadata.py
@@ -52,10 +54,10 @@ jobs:
           echo "HODD_KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
           echo "HODD_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "HODD_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-      - run: ./gradlew :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+      - run: ./gradlew --build-cache --parallel :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
       - name: Build and verify signed APK
         run: |
-          ./gradlew :app:assembleRelease
+          ./gradlew --build-cache :app:assembleRelease
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk | tee "$RUNNER_TEMP/hodd-signature.txt"
           if [ "${{ steps.signing.outputs.ready }}" = 'true' ]; then
             expected=$(openssl x509 -in docs/signing-certificate.pem -outform DER | sha256sum | cut -d ' ' -f 1)
