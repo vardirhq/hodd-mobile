@@ -45,8 +45,7 @@ class BackupArchiveTest {
         assertEquals(listOf("one"), staged.catalog.itemsForView(staged.catalog.savedViews.single()).map { it.id })
     }
     @Test fun `legacy catalog without organization fields still loads`() {
-        val encoded = CatalogCodec.encode(catalog)
-            .replace(Regex(",\\\"tags\\\":\\\\[\\\\]"), "")
+        val encoded = """{"version":1,"collections":[{"id":"books","name":"Books"}],"items":[{"id":"legacy","collectionId":"books","title":"Old book"}]}"""
         val restored = CatalogCodec.decode(encoded)
         assertTrue(restored.items.single().tags.isEmpty())
         assertTrue(restored.items.single().location.isEmpty())
