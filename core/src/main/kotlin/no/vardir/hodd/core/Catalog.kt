@@ -37,6 +37,8 @@ data class CatalogItem(
     val attributes: Map<String, String> = emptyMap(),
     // Additional photos; photoName remains the primary cover for legacy catalogs.
     val photoNames: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val location: String = "",
 )
 
 @Serializable
@@ -49,7 +51,8 @@ data class Catalog(val version: Int = 1, val collections: List<Collection> = emp
     }
 
     fun save(item: CatalogItem): Catalog {
-        val clean = item.copy(title = item.title.trim(), creator = item.creator.trim(), barcode = item.barcode.trim(), lentTo = item.lentTo.trim())
+        val clean = item.copy(title = item.title.trim(), creator = item.creator.trim(), barcode = item.barcode.trim(), lentTo = item.lentTo.trim(), location = item.location.trim(), tags = item.tags.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() })
+        require(clean.tags.size <= 30 && clean.tags.all { it.length <= 60 } && clean.location.length <= 120) { "Too many tags or an invalid location." }
         require(clean.title.isNotEmpty()) { "Add a title before saving." }
         require(collections.any { it.id == clean.collectionId }) { "Choose a collection." }
         require(clean.status != ItemStatus.LENT || clean.lentTo.isNotEmpty()) { "Who did you lend this to?" }
@@ -63,7 +66,7 @@ data class Catalog(val version: Int = 1, val collections: List<Collection> = emp
         val terms = query.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         return items.filter { item ->
             (collectionId == null || item.collectionId == collectionId) && (status == null || item.status == status) &&
-                terms.all { term -> listOf(item.title, item.creator, item.barcode, item.kind, item.format, item.notes, item.subtitle, item.series, item.volume, item.publisher, item.language, item.releaseYear, item.condition).plus(item.attributes.values).any { it.contains(term, ignoreCase = true) } }
+                terms.all { term -> listOf(item.title, item.creator, item.barcode, item.kind, item.format, item.notes, item.subtitle, item.series, item.volume, item.publisher, item.language, item.releaseYear, item.condition, item.location).plus(item.tags).plus(item.attributes.values).any { it.contains(term, ignoreCase = true) } }
         }.sortedByDescending { it.addedAt }
     }
 
@@ -85,6 +88,7 @@ object CatalogCodec {
         require(catalog.collections.map { it.id }.distinct().size == catalog.collections.size) { "Duplicate collection IDs." }
         require(catalog.items.map { it.id }.distinct().size == catalog.items.size) { "Duplicate item IDs." }
         catalog.items.forEach {
+            require(it.tags.size <= 30 && it.tags.all { tag -> tag.isNotBlank() && tag.length <= 60 } && it.location.length <= 120) { "Invalid organization metadata." }
             require(it.photoName == null || Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(it.photoName)) { "Invalid photo filename." }
             require(it.photoNames.size <= 20 && it.photoNames.distinct().size == it.photoNames.size) { "Invalid additional photo list." }
             require(it.photoNames.all { name -> Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(name) && name != it.photoName }) { "Invalid additional photo filename." }
