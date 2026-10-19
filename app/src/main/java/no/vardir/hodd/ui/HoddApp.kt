@@ -65,6 +65,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
             "edit" -> if (item != null) "detail" else detailReturn
             "detail" -> detailReturn
             "collection" -> collectionReturn
+            "insights" -> "home"
             else -> "home"
         }
     }
@@ -98,10 +99,10 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                     Icon(ShelfIcon, null, tint = Violet, modifier = Modifier.size(28.dp))
                     Spacer(Modifier.width(8.dp)); Text("HODD", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                 } },
-                navigationIcon = { if (page == "detail" || page == "collection") IconButton(onClick = { back() }) { Icon(Icons.Outlined.ArrowBack, "Back") } },
+                navigationIcon = { if (page == "detail" || page == "collection" || page == "insights") IconButton(onClick = { back() }) { Icon(Icons.Outlined.ArrowBack, "Back") } },
                 actions = {
                     IconButton(onClick = { aboutOpen = true }) { Icon(Icons.Outlined.Info, "About Hodd") }
-                    if (page != "detail") {
+                    if (page != "detail" && page != "insights") {
                         TextButton(onClick = { addItem() }) { Text("Add item") }
                         IconButton(onClick = { newCollection = true }) { Icon(Icons.Outlined.CreateNewFolder, "New collection") }
                     }
@@ -110,7 +111,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
             )
         },
         bottomBar = {
-            if (!editor && page != "detail") NavigationBar(containerColor = Paper) {
+            if (!editor && page != "detail" && page != "insights") NavigationBar(containerColor = Paper) {
                 listOf(Triple("home", "Home", Icons.Outlined.Home), Triple("collections", "Collections", Icons.Outlined.GridView), Triple("wishlist", "Wishlist", Icons.Outlined.FavoriteBorder)).forEach { (target, label, icon) ->
                     NavigationBarItem(selected = page == target || (target == "collections" && page == "collection"), onClick = { page = target; query = ""; collectionId = null }, icon = { Icon(icon, label) }, label = { Text(label) })
                 }
@@ -120,7 +121,8 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 when (page) {
-                    "home" -> HomeScreen(catalog, query, { query = it }, ::openCollection, ::openItem, { collectionId = null; page = "collection" }, { newCollection = true }, vm::loadExamples, vm.repository::photo)
+                    "home" -> HomeScreen(catalog, query, { query = it }, ::openCollection, ::openItem, { collectionId = null; page = "collection" }, { newCollection = true }, vm::loadExamples, vm.repository::photo, { page = "insights" })
+                    "insights" -> InsightsScreen(catalog)
                     "collections" -> CollectionsScreen(catalog, ::openCollection, { newCollection = true })
                     "collection", "wishlist" -> ItemsScreen(catalog, if (page == "wishlist") null else collection, page == "wishlist", query, { query = it }, ::openItem, ::addItem, vm.repository::photo, busy, vm::addSavedView, vm::removeSavedView)
                     "detail" -> if (item != null) ItemDetail(item, catalog.collections.find { it.id == item.collectionId }?.name.orEmpty(), vm.repository.photo(item.photoName), { page = "edit" }, { vm.deleteItem(item.id) { page = detailReturn } }, busy)
@@ -135,7 +137,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
 }
 
 @Composable
-private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, openCollection: (Collection) -> Unit, openItem: (CatalogItem) -> Unit, all: () -> Unit, create: () -> Unit, examples: () -> Unit, photo: (String?) -> File?) {
+private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, openCollection: (Collection) -> Unit, openItem: (CatalogItem) -> Unit, all: () -> Unit, create: () -> Unit, examples: () -> Unit, photo: (String?) -> File?, openInsights: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Text("Your collection,\nwithin reach.", style = MaterialTheme.typography.headlineLarge) }
         item { SearchField(query, onQuery) }
@@ -164,6 +166,20 @@ private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Uni
                     }
                 }
             }
+            item {
+                OutlinedCard(onClick = openInsights, modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.outlinedCardColors(containerColor = Color.White)) {
+                    Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Insights, null, tint = Violet)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Collection insights", style = MaterialTheme.typography.titleMedium)
+                            Text("Growth, platforms, and what you own", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Icon(Icons.Outlined.ChevronRight, "Open insights", tint = Violet)
+                    }
+                }
+            }
             item { HorizontalDivider(color = Line) }
             item { SectionTitle("Recently added", "View all", all) }
             if (catalog.items.isEmpty()) item { Text("Your first find belongs here. Tap Add item to save it.", color = Muted) }
@@ -172,6 +188,80 @@ private fun HomeScreen(catalog: Catalog, query: String, onQuery: (String) -> Uni
                 val counts = catalog.counts()
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Stat("Owned", counts.owned, Modifier.weight(1f)); Stat("Wanted", counts.wanted, Modifier.weight(1f)); Stat("Lent out", counts.lent, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun InsightsScreen(catalog: Catalog) {
+    var selectedCollection by rememberSaveable { mutableStateOf<String?>(null) }
+    val stats = catalog.insights(selectedCollection)
+    LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 110.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Collection insights", style = MaterialTheme.typography.headlineLarge)
+                Text("A closer look at the things you've collected.", color = Muted)
+            }
+        }
+        if (catalog.collections.size > 1) item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(listOf<Pair<String?, String>>(null to "All collections") +
+                    catalog.collections.map { it.id to it.name }) { (id, name) ->
+                    FilterChip(selected = selectedCollection == id, onClick = { selectedCollection = id },
+                        label = { Text(name) })
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Stat("Total", stats.total, Modifier.weight(1f))
+                Stat("Owned", stats.owned, Modifier.weight(1f))
+                Stat("Wanted", stats.wanted, Modifier.weight(1f))
+            }
+        }
+        if (stats.total == 0) item {
+            Text("Add some items to see how your collection is taking shape.", color = Muted)
+        } else {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Organization", style = MaterialTheme.typography.titleLarge)
+                    Text("${stats.lent} lent out · ${stats.tagged} tagged · ${stats.located} with a storage location", color = Muted)
+                }
+            }
+            if (stats.byKind.isNotEmpty()) item { InsightBreakdown("Collection types", stats.byKind) }
+            if (stats.byPlatform.isNotEmpty()) item { InsightBreakdown("Game platforms", stats.byPlatform) }
+            if (selectedCollection == null && stats.byCollection.size > 1) item {
+                InsightBreakdown("Your shelves", stats.byCollection)
+            }
+            if (stats.monthlyAdditions.isNotEmpty()) item {
+                InsightBreakdown("Added by month", stats.monthlyAdditions.takeLast(12).reversed()
+                    .map { it.first.toString() to it.second })
+            }
+        }
+    }
+}
+
+@Composable
+private fun InsightBreakdown(title: String, rows: List<Pair<String, Int>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
+        Surface(shape = RoundedCornerShape(20.dp), color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Line)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                val max = rows.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
+                rows.take(10).forEach { (label, count) ->
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row {
+                            Text(label, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(count.toString(), fontWeight = FontWeight.SemiBold)
+                        }
+                        LinearProgressIndicator(progress = { count.toFloat() / max },
+                            modifier = Modifier.fillMaxWidth(), color = Violet, trackColor = Line)
+                    }
                 }
             }
         }
