@@ -71,7 +71,7 @@ class PhotoEditingTest {
                         save = { saved = it }, cancel = {}, message = {})
                 }
                 if (registry == null) content() else CompositionLocalProvider(LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner {
-                    override val activityResultRegistry = registry
+                    override val activityResultRegistry: ActivityResultRegistry = requireNotNull(registry)
                 }) { content() }
             }
         }
