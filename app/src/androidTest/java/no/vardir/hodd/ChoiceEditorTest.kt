@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import no.vardir.hodd.core.*
 import no.vardir.hodd.ui.HoddTheme
 import no.vardir.hodd.ui.ItemEditor
@@ -16,8 +17,9 @@ import java.io.File
 class ChoiceEditorTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private var saved: CatalogItem? = null
+    private val restoration by lazy { StateRestorationTester(compose) }
     private fun editor(item: CatalogItem, previous: List<CatalogItem> = emptyList()) {
-        compose.setContent { HoddTheme { ItemEditor(item, listOf(Collection("shelf", "Shelf")), "shelf", false,
+        restoration.setContent { HoddTheme { ItemEditor(item, listOf(Collection("shelf", "Shelf")), "shelf", false,
             photo = { null }, importPhoto = { _, done -> done(null) }, save = { saved = it }, cancel = {}, message = {}, savedItems = previous) } }
     }
     private fun open(key: String) { compose.onNodeWithTag("choice-$key").performScrollTo().performClick() }
@@ -37,6 +39,7 @@ class ChoiceEditorTest {
         open("platformBrand"); search("Sony"); select("Sony")
         compose.onNodeWithText("Change brand").performClick()
         open("platform"); search("ps5"); select("PlayStation 5")
+        restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("Save changes").performClick()
         assertEquals("Sony", saved!!.attributes["platformBrand"])
         assertEquals("PlayStation 5", saved!!.attributes["platform"])

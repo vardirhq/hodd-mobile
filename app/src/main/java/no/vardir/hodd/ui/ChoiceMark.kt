@@ -2,6 +2,8 @@ package no.vardir.hodd.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.Icon
@@ -59,7 +61,7 @@ internal fun ChoiceMark(field: String, value: String) {
         }
     }
     if (logo != null) Image(painterResource(logo), null, Modifier.size(width = 48.dp, height = 32.dp))
-    else Icon(when (field) {
+    else Box(Modifier.size(width = 48.dp, height = 32.dp), contentAlignment = Alignment.Center) { Icon(when (field) {
         "platform", "platformBrand", "developer" -> Icons.Outlined.SportsEsports
         "language" -> Icons.Outlined.Translate
         "country", "region" -> Icons.Outlined.Public
@@ -68,5 +70,5 @@ internal fun ChoiceMark(field: String, value: String) {
         "binding", "format" -> Icons.Outlined.Category
         "releaseYear", "mintYear" -> Icons.Outlined.CalendarToday
         else -> Icons.Outlined.Label
-    }, null, Modifier.size(24.dp), tint = Muted)
+    }, null, Modifier.size(24.dp), tint = Muted) }
 }

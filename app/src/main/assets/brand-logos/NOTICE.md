@@ -2,7 +2,7 @@
 
 These marks identify catalog choices; Hodd is not affiliated with the named brands.
 
-Vectors were converted from Simple Icons 11.15.0 SVG paths to Android VectorDrawable resources. Geometry is unchanged; fill is a single dark color for contrast. The Simple Icons CC0 dedication and disclaimer are reproduced alongside this notice. Trademark rights remain with their respective owners. Original sources are listed below.
+Vectors were converted from Simple Icons 11.15.0 SVG paths to Android VectorDrawable resources. Geometry is unchanged; transparent padding is cropped with translated viewports that preserve aspect ratios; fill is a single dark color for contrast. The Simple Icons CC0 dedication and disclaimer are reproduced alongside this notice. Trademark rights remain with their respective owners. Original sources are listed below.
 
 Platform options without a dedicated mark use their brand mark when available, otherwise a generic system icon. Custom options use generic icons. Nintendo Switch 2 uses the Nintendo brand mark, not the Nintendo Switch logo. Lists are curated and do not claim exhaustive historical coverage.
 

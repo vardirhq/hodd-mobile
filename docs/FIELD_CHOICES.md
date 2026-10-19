@@ -24,6 +24,6 @@ Reference lists live in `core/FieldChoices.kt`; changes are reviewed with the ap
 - https://www.playstation.com/en-us/ps5/
 - https://www.xbox.com/en-US/consoles
 
-32 brand/platform marks are bundled as VectorDrawables from Simple Icons 11.15.0; original paths are converted without geometry edits and use one dark fill for contrast. See `app/src/main/assets/brand-logos/NOTICE.md`, `LICENSE.md` and `DISCLAIMER.md` for provenance and notices. Assets are shown as identifiers, with no endorsement implied. Dedicated platform marks are used when available; other platforms use a brand mark or a generic icon. Unknown/custom choices use generic icons. No logo fetch, hosting, credential or network request is required.
+32 brand/platform marks are bundled as VectorDrawables from Simple Icons 11.15.0; original paths are converted without geometry edits, use tightly cropped viewports with matching aspect ratios, and use one dark fill for contrast. See `app/src/main/assets/brand-logos/NOTICE.md`, `LICENSE.md` and `DISCLAIMER.md` for provenance and notices. Assets are shown as identifiers, with no endorsement implied. Dedicated platform marks are used when available; other platforms use a brand mark or a generic icon. Unknown/custom choices use generic icons. No logo fetch, hosting, credential or network request is required.
 
 To extend coverage, add a correctly sourced vector, preserve source and license notices, then update ChoiceMark. Do not substitute an unrelated system’s logo (Switch 2 intentionally uses the Nintendo brand mark).
