@@ -8,7 +8,7 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ### Changed
 - Cover identification first tries image plus OCR input through the local model, with text/OCR fallback when unsupported or unsuccessful.
-- Updated the optional ML Kit Prompt integration to 1.0.0-beta4 and made cover prompts category-aware.
+- Made cover prompts category-aware, using image input from the existing pinned ML Kit Prompt integration.
 - Cover results retain raw text alternatives; recognized text, suggested title, creator and type can be reviewed/corrected before applying.
 - Cover-to-catalog lookup now requires reviewing the search identity before sending it online.
 

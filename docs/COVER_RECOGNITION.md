@@ -3,7 +3,7 @@
 ## Input and fallbacks
 
 1. Bundled ML Kit OCR reads the cover locally, retaining line text, relative order and text height.
-2. A supported/available local Gemini Nano model first receives an EXIF-corrected, downsampled cover bitmap plus OCR hints. ML Kit Prompt is pinned to 1.0.0-beta4. No cloud AI is called.
+2. A supported/available local Gemini Nano model first receives an EXIF-corrected, downsampled cover bitmap plus OCR hints. ML Kit Prompt remains pinned to 1.0.0-alpha1, whose published AAR includes ImagePart; its image request API is used without changing the Kotlin toolchain. No cloud AI is called.
 3. If image input is unsupported, fails, times out or returns a rejected result, the app tries category-aware text structuring. If that fails, raw OCR lines remain available.
 4. Cover text can be viewed/corrected and processed again locally. Title, creator and type are editable in the review before Apply. Nothing is saved until the item form is saved.
 

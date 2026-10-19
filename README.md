@@ -27,7 +27,7 @@ Covers without photos are generated locally from the title and type. Example dat
 
 ## Build
 
-Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Compose compiler 2.1.20, AGP 8.7.3 and Gradle 8.11.1 are pinned. The optional ML Kit Prompt integration is pinned to 1.0.0-beta4; its availability and behavior depend on the device and AICore.
+Requires JDK 17 and an Android SDK with API 35 and Build Tools 35.0.0. Kotlin/Compose compiler 2.1.20, AGP 8.7.3 and Gradle 8.11.1 are pinned. The optional ML Kit Prompt integration is pinned to 1.0.0-alpha1; its availability and behavior depend on the device and AICore.
 
 ```sh
 ./gradlew :core:test :app:assembleDebug :app:lintDebug
