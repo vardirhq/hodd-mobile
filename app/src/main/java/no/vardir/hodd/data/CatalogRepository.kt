@@ -81,7 +81,13 @@ class CatalogRepository(private val context: Context, private val root: File = c
     }
 
     internal suspend fun restoreRecovery(id: String) = withContext(Dispatchers.IO) {
-        lock.withLock { commit(history.read(id), preserveUnreadable = true) }
+        lock.withLock {
+            val candidate = history.read(id)
+            require(candidate.items.mapNotNull { it.photoName }.all { photo(it)?.isFile == true }) {
+                "A recovery photo is missing. Import a complete exported backup instead. Nothing was replaced."
+            }
+            commit(candidate, preserveUnreadable = true)
+        }
     }
 
     fun photo(name: String?): File? = name?.takeIf { Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(it) }?.let { File(root, "photos/$it") }

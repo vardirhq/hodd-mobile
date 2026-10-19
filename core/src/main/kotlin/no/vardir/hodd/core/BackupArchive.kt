@@ -66,8 +66,10 @@ object BackupArchive {
                 entry("photos/$name", image!!.inputStream(), MAX_PHOTO_BYTES)
             }
             val manifest = BackupManifest(createdAt = System.currentTimeMillis(), appVersion = appVersion, entries = hashes)
+            val metadata = json.encodeToString(BackupManifest.serializer(), manifest).toByteArray(Charsets.UTF_8)
+            require(metadata.size <= MAX_MANIFEST_BYTES && total + metadata.size <= MAX_TOTAL_BYTES) { "Backup limits exceeded." }
             zip.putNextEntry(ZipEntry("manifest.json"))
-            zip.write(json.encodeToString(BackupManifest.serializer(), manifest).toByteArray(Charsets.UTF_8))
+            zip.write(metadata)
             zip.closeEntry()
         }
     }

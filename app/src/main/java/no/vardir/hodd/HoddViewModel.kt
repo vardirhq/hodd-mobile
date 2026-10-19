@@ -42,7 +42,7 @@ class HoddViewModel(application: Application) : AndroidViewModel(application) {
             try { repository.update(block); onSaved() }
             catch (error: Exception) {
                 if (error is CancellationException) throw error
-                mutableError.value = if (error is IllegalArgumentException) error.message else "Could not save. Your previous collection is safe; please try again."
+                mutableError.value = if (error is IllegalArgumentException) error.message else "Could not verify the save. Retry, or open Backups & recovery to review saved revisions."
             } finally { mutableBusy.value = false }
         }
     }

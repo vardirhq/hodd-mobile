@@ -89,5 +89,9 @@ class RepositoryBackupTest {
         repo.restoreRecovery(saved.id)
         assertEquals(beforeDelete, repo.catalog.value)
         assertTrue(repo.photo("cover.jpg")!!.exists())
+        val bytes = File(root, "catalog.json").readBytes()
+        repo.photo("cover.jpg")!!.delete()
+        try { repo.restoreRecovery(saved.id); fail("Recovery accepted a missing photo") } catch (_: IllegalArgumentException) { }
+        assertArrayEquals(bytes, File(root, "catalog.json").readBytes())
     } }
 }
