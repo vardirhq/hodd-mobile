@@ -78,6 +78,12 @@ internal fun ItemEditor(
     var pendingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var editingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var editingTemporary by rememberSaveable(draftId) { mutableStateOf(false) }
+    val createdPhotos = remember(draftId) { mutableSetOf<String>() }
+    fun discardUnsavedPhotos() {
+        val keep = (listOfNotNull(existing?.photoName) + existing?.photoNames.orEmpty()).toSet()
+        createdPhotos.filterNot { it in keep }.forEach { photo(it)?.delete() }
+        createdPhotos.clear()
+    }
     var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var assisting by remember { mutableStateOf(false) }
@@ -97,13 +103,13 @@ internal fun ItemEditor(
     val status = ItemStatus.valueOf(statusName)
     val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames)
     val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
-    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else cancel() } }
+    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { barcode = it; message("Identifier inserted.") }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) { editingPhoto = it; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() }; importing = false } }
+        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) { createdPhotos.add(it); editingPhoto = it; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() }; importing = false } }
     }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val name = pendingPhoto
@@ -116,6 +122,7 @@ internal fun ItemEditor(
             val target = photo(name)!!
             target.parentFile!!.mkdirs()
             pendingPhoto = name
+            createdPhotos.add(name)
             camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", target))
         } catch (_: Exception) {
             pendingPhoto = null
@@ -184,10 +191,11 @@ internal fun ItemEditor(
                 if (editingAdditional != null) photoNames = photoNames.map { if (it == editingAdditional) editedName else it }
                 else if (addingAdditional && photoName != null) photoNames = photoNames + editedName
                 else photoName = editedName
-                if (editingTemporary) source.delete()
+                if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
+                createdPhotos.add(editedName)
                 editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; offerIdentification = true
             }, onCancel = {
-                if (editingTemporary) source.delete()
+                if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
                 editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
             }, message = message)
             return
@@ -197,7 +205,7 @@ internal fun ItemEditor(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
             Surface(shadowElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
-                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
+                Button(onClick = { save(draft); createdPhotos.clear() }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
                     if (busy || importing || assisting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     else { Icon(Icons.Outlined.Check, null); Spacer(Modifier.width(8.dp)); Text(if (existing == null) "Save to collection" else "Save changes") }
                 }
