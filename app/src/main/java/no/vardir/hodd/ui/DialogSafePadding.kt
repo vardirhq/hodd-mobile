@@ -22,7 +22,7 @@ internal fun dialogSafePadding(): PaddingValues {
         val listener = ViewTreeObserver.OnGlobalLayoutListener {
             if (view.width > 0 && view.height > 0) {
                 val safe = if (Build.VERSION.SDK_INT >= 30) {
-                    val metrics = view.context.getSystemService(WindowManager::class.java).currentWindowMetrics
+                    val metrics = (view.context.getSystemService(android.content.Context.WINDOW_SERVICE) as WindowManager).currentWindowMetrics
                     val bars = metrics.windowInsets.getInsets(android.view.WindowInsets.Type.systemBars() or
                         android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.ime())
                     Rect(metrics.bounds).apply { left += bars.left; top += bars.top; right -= bars.right; bottom -= bars.bottom }
