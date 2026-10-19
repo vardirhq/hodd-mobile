@@ -4,6 +4,14 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] - 2026-10-19
+
+### Added
+- Camera and gallery photos open a local editor with a movable/resizable crop, brightness and contrast previews, rotation, reset and precise crop sliders.
+- Existing covers can be edited through Edit photo; edits save to a new file and cancellation preserves the current cover.
+- Accepting an edited photo offers on-device identification followed by reviewed online catalog lookup, with a Not now option.
+- EXIF-aware, bounded photo decoding and verified JPEG exports; original photos and saved catalog entries are not overwritten by editing.
+
 ## [0.1.0-alpha.5] - 2026-10-19
 
 ### Added

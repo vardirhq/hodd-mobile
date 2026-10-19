@@ -30,6 +30,8 @@ internal fun ItemAssistPanel(
     working: (Boolean) -> Unit, message: (String) -> Unit,
     assistant: LocalItemAssistant? = null,
     metadataRepository: MetadataRepository? = null,
+    offerIdentification: Boolean = false,
+    onIdentificationOffered: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val local = remember(assistant) { assistant ?: LocalItemAssistant(context.applicationContext) }
@@ -71,6 +73,25 @@ internal fun ItemAssistPanel(
         }
     }
 
+    fun identifyForLookup() {
+        if (cover == null) return
+        task("Reading your photo on-device…") {
+            val recognized = local.readCover(cover, draft.kind)
+            recognizedText = recognized.recognizedText
+            notice = "${recognized.notice} Review the title, creator and type before choosing Find catalog matches. No search has been sent."
+            suggestions = recognized.items
+            if (suggestions.isEmpty()) { editCoverText = recognizedText.isNotBlank(); message(recognized.notice) }
+            status = local.status()
+        }
+    }
+    if (offerIdentification && cover != null) AlertDialog(
+        onDismissRequest = onIdentificationOffered,
+        title = { Text("Find details from this photo?") },
+        text = { Text("Read the edited photo on this device, then review the title and type before looking up catalog details online. Your photo stays on-device.") },
+        confirmButton = { TextButton(onClick = { onIdentificationOffered(); expanded = true; identifyForLookup() }, enabled = enabled && !running) { Text("Identify photo") } },
+        dismissButton = { TextButton(onClick = onIdentificationOffered) { Text("Not now") } },
+    )
+
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { expanded = !expanded }, enabled = !running, contentPadding = PaddingValues(0.dp)) {
@@ -103,14 +124,7 @@ internal fun ItemAssistPanel(
                 }
                 if (cover != null && draft.kind in listOf("Book", "Comic", "Vinyl", "CD", "Game", "Movie")) {
                     OutlinedButton(onClick = {
-                        task("Identifying cover and finding catalog matches…") {
-                            val recognized = local.readCover(cover, draft.kind)
-                            recognizedText = recognized.recognizedText
-                            notice = "${recognized.notice} Review the title, creator and type before choosing Find catalog matches. No search has been sent."
-                            suggestions = recognized.items
-                            if (suggestions.isEmpty()) { editCoverText = recognizedText.isNotBlank(); message(recognized.notice) }
-                            status = local.status()
-                        }
+                        identifyForLookup()
                     }, enabled = enabled && !running, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))

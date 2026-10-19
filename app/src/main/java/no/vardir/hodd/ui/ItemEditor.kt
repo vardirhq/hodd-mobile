@@ -73,6 +73,9 @@ internal fun ItemEditor(
     var lentTo by rememberSaveable(draftId) { mutableStateOf(existing?.lentTo.orEmpty()) }
     var photoName by rememberSaveable(draftId) { mutableStateOf(existing?.photoName) }
     var pendingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
+    var editingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
+    var editingTemporary by rememberSaveable(draftId) { mutableStateOf(false) }
+    var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var assisting by remember { mutableStateOf(false) }
     var metadataSource by rememberSaveable(draftId) { mutableStateOf(existing?.metadataSource.orEmpty()) }
@@ -97,11 +100,11 @@ internal fun ItemEditor(
         result.contents?.let { barcode = it; message("Identifier inserted.") }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) photoName = it; importing = false } }
+        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) { editingPhoto = it; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() }; importing = false } }
     }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val name = pendingPhoto
-        if (success && name != null) photoName = name else photo(name)?.delete()
+        if (success && name != null) { editingPhoto = name; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() } else photo(name)?.delete()
         pendingPhoto = null
     }
     fun takePhoto() {
@@ -171,6 +174,20 @@ internal fun ItemEditor(
         }, { fieldScan = null; file.delete() }, { message(it); fieldScan = null; file.delete() })
         return
     }
+    editingPhoto?.let { sourceName ->
+        val source = photo(sourceName)
+        if (source != null) {
+            PhotoEditor(source, onAccepted = { editedName ->
+                photoName = editedName
+                if (editingTemporary) source.delete()
+                editingPhoto = null; editingTemporary = false; offerIdentification = true
+            }, onCancel = {
+                if (editingTemporary) source.delete()
+                editingPhoto = null; editingTemporary = false
+            }, message = message)
+            return
+        }
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
@@ -195,7 +212,10 @@ internal fun ItemEditor(
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
                         else cameraPermission.launch(Manifest.permission.CAMERA)
                     }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
-                    if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy) { Text("Remove photo") }
+                    if (photoName != null) TextButton(onClick = {
+                        focusManager.clearFocus(); keyboard?.hide(); editingPhoto = photoName; editingTemporary = false
+                    }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Crop, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Edit photo") }
+                    if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy && !importing && !assisting) { Text("Remove photo") }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -292,7 +312,7 @@ internal fun ItemEditor(
                 subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
                 metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
                 if (downloadedCover != null) photoName = downloadedCover
-            }, working = { assisting = it }, message = message)
+            }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false })
             Text("On your shelf", style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ItemStatus.entries.forEach { value -> FilterChip(selected = status == value, onClick = { statusName = value.name }, label = { Text(value.label) }) }
