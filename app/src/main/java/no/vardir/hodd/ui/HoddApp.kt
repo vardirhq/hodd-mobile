@@ -208,7 +208,22 @@ private fun CollectionsScreen(catalog: Catalog, open: (Collection) -> Unit, crea
 private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boolean, query: String, onQuery: (String) -> Unit, open: (CatalogItem) -> Unit, add: () -> Unit, photo: (String?) -> File?) {
     var filterName by rememberSaveable(collection?.id, wishlist) { mutableStateOf("All") }
     val status = if (wishlist) ItemStatus.WANTED else ItemStatus.entries.find { it.label == filterName }
-    val results = catalog.search(query, collection?.id, status)
+    var tagFilter by rememberSaveable(collection?.id, wishlist) { mutableStateOf("") }
+    var locationFilter by rememberSaveable(collection?.id, wishlist) { mutableStateOf("") }
+    var sortBy by rememberSaveable(collection?.id, wishlist) { mutableStateOf("Newest") }
+    val available = catalog.items.filter { collection == null || it.collectionId == collection.id }
+    val tags = available.flatMap { it.tags }.distinct().sorted()
+    val locations = available.map { it.location }.filter { it.isNotBlank() }.distinct().sorted()
+    val filtered = catalog.search(query, collection?.id, status).filter { item ->
+        (tagFilter.isBlank() || item.tags.any { it.equals(tagFilter, ignoreCase = true) }) &&
+            (locationFilter.isBlank() || item.location == locationFilter)
+    }
+    val results = when (sortBy) {
+        "Title" -> filtered.sortedBy { it.title.lowercase() }
+        "Oldest" -> filtered.sortedBy { it.addedAt }
+        "Release year" -> filtered.sortedWith(compareByDescending<CatalogItem> { it.releaseYear.toIntOrNull() ?: 0 }.thenBy { it.title })
+        else -> filtered
+    }
     LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 110.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Text(if (wishlist) "The next find" else collection?.name ?: "All items", style = MaterialTheme.typography.headlineLarge) }
         item { Text(if (wishlist) "A little room for what’s still out there." else "${catalog.counts(collection?.id).owned} owned · ${catalog.counts(collection?.id).wanted} wanted", color = Muted) }
@@ -216,6 +231,35 @@ private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boo
         if (!wishlist) item {
             androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(listOf("All") + ItemStatus.entries.map { it.label }) { label -> FilterChip(selected = filterName == label, onClick = { filterName = label }, label = { Text(label) }) }
+            }
+        }
+        if (tags.isNotEmpty() || locations.isNotEmpty()) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (tags.isNotEmpty()) {
+                    Text("Tags", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf("") + tags) { tag ->
+                            FilterChip(selected = tagFilter == tag, onClick = { tagFilter = tag },
+                                label = { Text(tag.ifBlank { "All tags" }) })
+                        }
+                    }
+                }
+                if (locations.isNotEmpty()) {
+                    Text("Locations", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf("") + locations) { location ->
+                            FilterChip(selected = locationFilter == location, onClick = { locationFilter = location },
+                                label = { Text(location.ifBlank { "Anywhere" }) })
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(listOf("Newest", "Oldest", "Title", "Release year")) { order ->
+                    FilterChip(selected = sortBy == order, onClick = { sortBy = order }, label = { Text(order) })
+                }
             }
         }
         item { Text("${results.size} ${if (results.size == 1) "item" else "items"}", color = Muted) }
