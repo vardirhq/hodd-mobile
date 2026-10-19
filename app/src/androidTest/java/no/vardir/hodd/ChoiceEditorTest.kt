@@ -22,9 +22,23 @@ class ChoiceEditorTest {
         restoration.setContent { HoddTheme { ItemEditor(item, listOf(Collection("shelf", "Shelf")), "shelf", false,
             photo = { null }, importPhoto = { _, done -> done(null) }, save = { saved = it }, cancel = {}, message = {}, savedItems = previous) } }
     }
-    private fun open(key: String) { compose.onNodeWithTag("choice-$key").performScrollTo().performClick() }
-    private fun search(value: String) { compose.onNodeWithTag("choice-search").performTextReplacement(value) }
-    private fun select(value: String) { compose.onNodeWithTag("choice-results").performScrollToNode(hasTestTag("option-$value")); compose.onNodeWithTag("option-$value").performClick() }
+    private fun open(key: String) {
+        compose.waitForIdle()
+        compose.onNodeWithTag("choice-$key").performScrollTo().performClick()
+        compose.waitForIdle()
+    }
+    private fun search(value: String) {
+        compose.waitForIdle()
+        compose.onNodeWithTag("choice-search").performTextReplacement(value)
+        compose.waitForIdle()
+    }
+    private fun select(value: String) {
+        compose.waitForIdle()
+        compose.onNodeWithTag("choice-results").performScrollToNode(hasTestTag("option-$value"))
+        compose.waitForIdle()
+        compose.onNodeWithTag("option-$value").performClick()
+        compose.waitForIdle()
+    }
     private fun screenshot(name: String) {
         val folder = File(compose.activity.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(folder, name).outputStream().use { compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
