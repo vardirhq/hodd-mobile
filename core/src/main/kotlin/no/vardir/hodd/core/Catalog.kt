@@ -42,7 +42,10 @@ data class CatalogItem(
 )
 
 @Serializable
-data class Catalog(val version: Int = 1, val collections: List<Collection> = emptyList(), val items: List<CatalogItem> = emptyList()) {
+data class SavedView(val id: String = UUID.randomUUID().toString(), val name: String, val collectionId: String? = null, val tag: String = "", val location: String = "", val status: ItemStatus? = null)
+
+@Serializable
+data class Catalog(val version: Int = 1, val collections: List<Collection> = emptyList(), val items: List<CatalogItem> = emptyList(), val savedViews: List<SavedView> = emptyList()) {
     fun addCollection(name: String): Catalog {
         val clean = name.trim()
         require(clean.isNotEmpty()) { "Give your collection a name." }
@@ -70,6 +73,22 @@ data class Catalog(val version: Int = 1, val collections: List<Collection> = emp
         }.sortedByDescending { it.addedAt }
     }
 
+    fun addSavedView(name: String, collectionId: String? = null, tag: String = "", location: String = "", status: ItemStatus? = null): Catalog {
+        val clean = name.trim()
+        require(clean.isNotEmpty() && clean.length <= 80) { "Give the saved view a name (up to 80 characters)." }
+        require(savedViews.none { it.name.equals(clean, ignoreCase = true) }) { "A saved view with that name already exists." }
+        require(collectionId == null || collections.any { it.id == collectionId }) { "Unknown collection." }
+        return copy(savedViews = savedViews + SavedView(name = clean, collectionId = collectionId, tag = tag.trim(), location = location.trim(), status = status))
+    }
+
+    fun removeSavedView(id: String): Catalog = copy(savedViews = savedViews.filterNot { it.id == id })
+
+    fun itemsForView(view: SavedView): List<CatalogItem> =
+        search(collectionId = view.collectionId, status = view.status).filter { item ->
+            (view.tag.isBlank() || item.tags.any { it.equals(view.tag, ignoreCase = true) }) &&
+                (view.location.isBlank() || item.location.equals(view.location, ignoreCase = true))
+        }
+
     fun removeItem(id: String) = copy(items = items.filterNot { it.id == id })
     fun counts(collectionId: String? = null): Counts {
         val selected = items.filter { collectionId == null || it.collectionId == collectionId }
@@ -87,6 +106,12 @@ object CatalogCodec {
         require(catalog.version == 1) { "This collection was saved by a newer version of Hodd." }
         require(catalog.collections.map { it.id }.distinct().size == catalog.collections.size) { "Duplicate collection IDs." }
         require(catalog.items.map { it.id }.distinct().size == catalog.items.size) { "Duplicate item IDs." }
+        require(catalog.savedViews.map { it.id }.distinct().size == catalog.savedViews.size) { "Duplicate saved view IDs." }
+        require(catalog.savedViews.map { it.name.lowercase() }.distinct().size == catalog.savedViews.size) { "Duplicate saved view names." }
+        catalog.savedViews.forEach { view ->
+            require(view.name.isNotBlank() && view.name.length <= 80 && view.tag.length <= 60 && view.location.length <= 120) { "Invalid saved view." }
+            require(view.collectionId == null || catalog.collections.any { it.id == view.collectionId }) { "Saved view references missing collection." }
+        }
         catalog.items.forEach {
             require(it.tags.size <= 30 && it.tags.all { tag -> tag.isNotBlank() && tag.length <= 60 } && it.location.length <= 120) { "Invalid organization metadata." }
             require(it.photoName == null || Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(it.photoName)) { "Invalid photo filename." }
