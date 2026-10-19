@@ -1,0 +1,272 @@
+{
+  "entities": {
+    "Q61831178": {
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Super Mario Maker 2"
+        }
+      },
+      "claims": {
+        "P31": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "hash": "03d2d8ec4a899b29435a104a9ce7c189a31ae380",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 7889,
+                  "id": "Q7889"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P31",
+              "hash": "e4e8b44ac818c8d037a5004d193c3f1b84b4ccae",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 767899,
+                  "id": "Q767899"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P400": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P400",
+              "hash": "2e31cb0a82f44474a5c42bb159a94cc48633fffd",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 19610114,
+                  "id": "Q19610114"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P577": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P577",
+              "hash": "d7ab51f04dd784eddf138af6314c2789fa681c51",
+              "datavalue": {
+                "value": {
+                  "time": "+2019-06-28T00:00:00Z",
+                  "timezone": 0,
+                  "before": 0,
+                  "after": 0,
+                  "precision": 11,
+                  "calendarmodel": "http://www.wikidata.org/entity/Q1985727"
+                },
+                "type": "time"
+              },
+              "datatype": "time"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P136": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P136",
+              "hash": "b961fca2df841c993d8a208340ed7a3338a21ab4",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 828322,
+                  "id": "Q828322"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P123": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P123",
+              "hash": "1666484cce79757c707cf1f888bdeb98c9321c66",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 8093,
+                  "id": "Q8093"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P178": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P178",
+              "hash": "cbfcede9b3bca5fb85dc868524833ca525c9dd35",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 20972825,
+                  "id": "Q20972825"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ],
+        "P179": [
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P179",
+              "hash": "8a506c86a61d642c57382b962b8926cb2c1e342b",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 61874270,
+                  "id": "Q61874270"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          },
+          {
+            "mainsnak": {
+              "snaktype": "value",
+              "property": "P179",
+              "hash": "48a9c5a5597ba5795d6285b936ba96eb01ba8095",
+              "datavalue": {
+                "value": {
+                  "entity-type": "item",
+                  "numeric-id": 4802838,
+                  "id": "Q4802838"
+                },
+                "type": "wikibase-entityid"
+              },
+              "datatype": "wikibase-item"
+            },
+            "rank": "normal"
+          }
+        ]
+      }
+    },
+    "Q20972825": {
+      "type": "item",
+      "id": "Q20972825",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Nintendo Entertainment Planning & Development"
+        },
+        "mul": {
+          "language": "mul",
+          "value": "Nintendo Entertainment Planning & Development"
+        }
+      }
+    },
+    "Q8093": {
+      "type": "item",
+      "id": "Q8093",
+      "labels": {
+        "mul": {
+          "language": "mul",
+          "value": "Nintendo"
+        },
+        "en": {
+          "language": "en",
+          "value": "Nintendo"
+        }
+      }
+    },
+    "Q61874270": {
+      "type": "item",
+      "id": "Q61874270",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Super Mario Maker"
+        },
+        "mul": {
+          "value": "Super Mario Maker",
+          "language": "en",
+          "for-language": "mul"
+        }
+      }
+    },
+    "Q4802838": {
+      "type": "item",
+      "id": "Q4802838",
+      "labels": {
+        "mul": {
+          "language": "mul",
+          "value": "Super Mario"
+        },
+        "en": {
+          "value": "Super Mario",
+          "language": "mul",
+          "for-language": "en"
+        }
+      }
+    },
+    "Q19610114": {
+      "type": "item",
+      "id": "Q19610114",
+      "labels": {
+        "mul": {
+          "language": "mul",
+          "value": "Nintendo Switch"
+        },
+        "en": {
+          "value": "Nintendo Switch",
+          "language": "mul",
+          "for-language": "en"
+        }
+      }
+    },
+    "Q828322": {
+      "type": "item",
+      "id": "Q828322",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "platform game"
+        },
+        "mul": {
+          "value": "platform game",
+          "language": "en",
+          "for-language": "mul"
+        }
+      }
+    }
+  }
+}

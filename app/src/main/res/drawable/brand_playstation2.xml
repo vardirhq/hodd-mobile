@@ -1,0 +1,6 @@
+<!-- Simple Icons 11.15.0; see assets/brand-logos/NOTICE.md. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24.000000dp" android:height="4.142000dp" android:viewportWidth="24.000000" android:viewportHeight="4.142000">
+    <group android:translateX="-0.000000" android:translateY="-9.929000">
+        <path android:fillColor="#FF19191F" android:pathData="M7.46 13.779v.292h4.142v-3.85h3.796V9.93h-4.115v3.85zm16.248-3.558v1.62h-7.195v2.23H24v-.292h-7.168v-1.646H24V9.929h-7.487v.292zm-16.513 0v1.62H0v2.23h.292v-1.938H7.46V9.929H0v.292Z" />
+    </group>
+</vector>
