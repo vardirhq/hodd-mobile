@@ -294,6 +294,7 @@ private fun CollectionsScreen(catalog: Catalog, open: (Collection) -> Unit, crea
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boolean, query: String, onQuery: (String) -> Unit, open: (CatalogItem) -> Unit, add: () -> Unit, photo: (String?) -> File?, busy: Boolean, saveView: (String, String?, String, String, ItemStatus?, () -> Unit) -> Unit, removeView: (String, () -> Unit) -> Unit) {
     var filterName by rememberSaveable(collection?.id, wishlist) { mutableStateOf("All") }
@@ -343,86 +344,117 @@ private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boo
             dismissButton = { TextButton(onClick = { namingView = false }) { Text("Cancel") } },
         )
     }
-    LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 110.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item { Text(if (wishlist) "The next find" else collection?.name ?: "All items", style = MaterialTheme.typography.headlineLarge) }
-        item { Text(if (wishlist) "A little room for what’s still out there." else "${catalog.counts(collection?.id).owned} owned · ${catalog.counts(collection?.id).wanted} wanted", color = Muted) }
-        item { SearchField(query, onQuery) }
-        if (!wishlist) item {
-            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("All") + ItemStatus.entries.map { it.label }) { label -> FilterChip(selected = filterName == label, onClick = { filterName = label }, label = { Text(label) }) }
-            }
-        }
-        if (tags.isNotEmpty() || locations.isNotEmpty()) item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    var filtersOpen by rememberSaveable(collection?.id, wishlist) { mutableStateOf(false) }
+    val activeFilters = listOf(!wishlist && filterName != "All", tagFilter.isNotBlank(),
+        locationFilter.isNotBlank(), sortBy != "Newest").count { it }
+    if (filtersOpen) {
+        ModalBottomSheet(onDismissRequest = { filtersOpen = false }) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 30.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Filter & sort", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        filterName = "All"; tagFilter = ""; locationFilter = ""; sortBy = "Newest"; selectedView = null
+                    }) { Text("Reset") }
+                }
+                if (!wishlist) {
+                    Text("Status", style = MaterialTheme.typography.titleSmall)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf("All") + ItemStatus.entries.map { it.label }) { label ->
+                            FilterChip(selected = filterName == label,
+                                onClick = { filterName = label; selectedView = null }, label = { Text(label) })
+                        }
+                    }
+                }
                 if (tags.isNotEmpty()) {
-                    Text("Tags", style = MaterialTheme.typography.labelMedium, color = Muted)
-                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tags", style = MaterialTheme.typography.titleSmall)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(listOf("") + tags) { tag ->
-                            FilterChip(selected = tagFilter == tag, onClick = { tagFilter = tag },
+                            FilterChip(selected = tagFilter == tag, onClick = { tagFilter = tag; selectedView = null },
                                 label = { Text(tag.ifBlank { "All tags" }) })
                         }
                     }
                 }
                 if (locations.isNotEmpty()) {
-                    Text("Locations", style = MaterialTheme.typography.labelMedium, color = Muted)
-                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Storage location", style = MaterialTheme.typography.titleSmall)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(listOf("") + locations) { location ->
-                            FilterChip(selected = locationFilter == location, onClick = { locationFilter = location },
+                            FilterChip(selected = locationFilter == location,
+                                onClick = { locationFilter = location; selectedView = null },
                                 label = { Text(location.ifBlank { "Anywhere" }) })
                         }
                     }
                 }
-            }
-        }
-        item {
-            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("Newest", "Oldest", "Title", "Release year")) { order ->
-                    FilterChip(selected = sortBy == order, onClick = { sortBy = order }, label = { Text(order) })
+                Text("Sort by", style = MaterialTheme.typography.titleSmall)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("Newest", "Oldest", "Title", "Release year")) { order ->
+                        FilterChip(selected = sortBy == order, onClick = { sortBy = order }, label = { Text(order) })
+                    }
                 }
-            }
-        }
-        if (!wishlist) item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Saved views", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { viewName = ""; namingView = true }, enabled = !busy) { Text("Save current filters") }
-                }
-                if (catalog.savedViews.isNotEmpty()) {
+                if (!wishlist) {
+                    HorizontalDivider(color = Line)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Saved views", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { viewName = ""; namingView = true }, enabled = !busy) { Text("Save filters") }
+                    }
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(catalog.savedViews.filter { it.collectionId == null || it.collectionId == collection?.id }) { view ->
-                            FilterChip(
-                                selected = selectedView == view.id,
-                                onClick = {
-                                    if (selectedView == view.id) {
-                                        selectedView = null
-                                        tagFilter = ""
-                                        locationFilter = ""
-                                        filterName = "All"
-                                    } else {
-                                        selectedView = view.id
-                                        tagFilter = view.tag
-                                        locationFilter = view.location
-                                        filterName = view.status?.label ?: "All"
-                                    }
-                                },
-                                label = { Text(view.name) },
-                            )
+                            FilterChip(selected = selectedView == view.id, onClick = {
+                                if (selectedView == view.id) {
+                                    selectedView = null; tagFilter = ""; locationFilter = ""; filterName = "All"
+                                } else {
+                                    selectedView = view.id; tagFilter = view.tag; locationFilter = view.location
+                                    filterName = view.status?.label ?: "All"
+                                }
+                            }, label = { Text(view.name) })
                         }
                     }
-                    if (activeView != null) {
-                        TextButton(onClick = {
-                            removeView(activeView.id) {
-                                selectedView = null
-                                tagFilter = ""
-                                locationFilter = ""
-                                filterName = "All"
-                            }
-                        }, enabled = !busy) { Text("Delete selected view") }
-                    }
+                    if (activeView != null) TextButton(onClick = {
+                        removeView(activeView.id) {
+                            selectedView = null; tagFilter = ""; locationFilter = ""; filterName = "All"
+                        }
+                    }, enabled = !busy) { Text("Delete selected view") }
+                }
+                Button(onClick = { filtersOpen = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Show results")
                 }
             }
         }
-        item { Text("${results.size} ${if (results.size == 1) "item" else "items"}", color = Muted) }
+    }
+    LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 110.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        item { Text(if (wishlist) "The next find" else collection?.name ?: "All items", style = MaterialTheme.typography.headlineLarge) }
+        item { Text(if (wishlist) "A little room for what’s still out there." else "${catalog.counts(collection?.id).owned} owned · ${catalog.counts(collection?.id).wanted} wanted", color = Muted) }
+        item { SearchField(query, onQuery) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${results.size} items", color = Muted, modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = { filtersOpen = true }) {
+                    Icon(Icons.Outlined.Tune, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (activeFilters == 0) "Filter & sort" else "Filters ($activeFilters)")
+                }
+            }
+        }
+        if (activeFilters > 0) item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!wishlist && filterName != "All") item {
+                    FilterChip(selected = true, onClick = { filterName = "All"; selectedView = null },
+                        label = { Text("$filterName ×") })
+                }
+                if (tagFilter.isNotBlank()) item {
+                    FilterChip(selected = true, onClick = { tagFilter = ""; selectedView = null },
+                        label = { Text("$tagFilter ×") })
+                }
+                if (locationFilter.isNotBlank()) item {
+                    FilterChip(selected = true, onClick = { locationFilter = ""; selectedView = null },
+                        label = { Text("$locationFilter ×") })
+                }
+                if (sortBy != "Newest") item {
+                    FilterChip(selected = true, onClick = { sortBy = "Newest" },
+                        label = { Text("$sortBy ×") })
+                }
+            }
+        }
         if (results.isEmpty()) item { EmptyState(Icons.Outlined.Search, "Nothing here yet", if (query.isNotBlank()) "Try another search or filter." else "Save your next find and make this shelf your own.", "Add an item", add) }
         items(results.chunked(2), key = { it.first().id }) { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
