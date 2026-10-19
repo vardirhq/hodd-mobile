@@ -1,6 +1,5 @@
 package no.vardir.hodd.data
 
-import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -78,7 +77,8 @@ object ProductLinkImporter {
         error("Too many redirects.")
     }
 
-    private fun productObject(value: Any?): JSONObject? = when (value) {
+    private fun productObject(value: Any?): JSONObject? {
+        return when (value) {
         is JSONObject -> {
             val type = value.opt("@type")
             val matches = when (type) {
@@ -98,11 +98,13 @@ object ProductLinkImporter {
             null
         }
         else -> null
+        }
     }
 
     private fun string(value: Any?): String = when (value) {
         is String -> value.trim()
         is JSONObject -> value.optString("name").trim()
+        is Number -> value.toString()
         is JSONArray -> if (value.length() > 0) string(value.opt(0)) else ""
         else -> ""
     }
