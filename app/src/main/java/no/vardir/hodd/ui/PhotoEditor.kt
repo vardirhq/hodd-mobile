@@ -147,11 +147,12 @@ private fun CropPreview(bitmap: Bitmap, crop: PhotoCrop, brightness: Float, cont
         .pointerInput(bitmap, enabled) {
             if (!enabled) return@pointerInput
             var handle = ""
-            val scale = min(size.width.toFloat() / bitmap.width, size.height.toFloat() / bitmap.height)
-            val width = bitmap.width * scale; val height = bitmap.height * scale
-            val x = (size.width - width) / 2; val y = (size.height - height) / 2
+            var width = 1f; var height = 1f
             val hit = 32.dp.toPx()
             detectDragGestures(onDragStart = { position ->
+                val scale = min(size.width.toFloat() / bitmap.width, size.height.toFloat() / bitmap.height)
+                width = bitmap.width * scale; height = bitmap.height * scale
+                val x = (size.width - width) / 2; val y = (size.height - height) / 2
                 val c = currentCrop
                 val px = position.x - x; val py = position.y - y
                 val nearL = abs(px - c.left * width) <= hit; val nearR = abs(px - c.right * width) <= hit
@@ -168,6 +169,7 @@ private fun CropPreview(bitmap: Bitmap, crop: PhotoCrop, brightness: Float, cont
         val scale = min(size.width / bitmap.width, size.height / bitmap.height)
         val width = bitmap.width * scale; val height = bitmap.height * scale
         val x = (size.width - width) / 2; val y = (size.height - height) / 2
+        drawRect(Color.White, Offset(x, y), Size(width, height))
         drawImage(image, dstOffset = IntOffset(x.roundToInt(), y.roundToInt()), dstSize = IntSize(width.roundToInt().coerceAtLeast(1), height.roundToInt().coerceAtLeast(1)), colorFilter = filter)
         val l = x + crop.left * width; val t = y + crop.top * height
         val r = x + crop.right * width; val b = y + crop.bottom * height
