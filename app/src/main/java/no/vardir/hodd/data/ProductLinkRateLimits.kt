@@ -22,7 +22,8 @@ class ProductLinkRateLimits(
         val raw = retryAfter?.trim().orEmpty()
         val seconds = raw.toLongOrNull()?.takeIf { it >= 0 } ?: runCatching {
             val date = ZonedDateTime.parse(raw, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()
-            java.time.Duration.between(now(), date).seconds.coerceAtLeast(1)
+            val wait = java.time.Duration.between(now(), date)
+            (wait.seconds + if (wait.nano > 0) 1 else 0).coerceAtLeast(1)
         }.getOrDefault(60)
         // Saturate only to prevent arithmetic overflow for malformed/absurd server values.
         val delay = seconds.coerceIn(1, (Long.MAX_VALUE / 2) / 1000) * 1000

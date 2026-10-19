@@ -13,7 +13,7 @@ class ProductLinkImporterTest {
     @Test fun retryAfterStopsSameHostRequestsButNotOtherStores() {
         var elapsed = 1000L
         val limits = no.vardir.hodd.data.ProductLinkRateLimits(
-            now = { java.time.Instant.parse("2026-10-19T22:00:00Z") }, elapsed = { elapsed })
+            now = { java.time.Instant.parse("2026-10-19T22:00:00.500Z") }, elapsed = { elapsed })
         fun refusal(header: String?) = runCatching { limits.refused("SHOP.example", header) }.exceptionOrNull()!!
         assertTrue(refusal("120").message!!.contains("120 seconds"))
         assertTrue(runCatching { limits.check("shop.example") }.isFailure)
