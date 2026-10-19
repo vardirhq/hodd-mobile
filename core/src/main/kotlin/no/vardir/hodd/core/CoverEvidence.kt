@@ -23,6 +23,9 @@ class CoverEvidence(val lines: List<CoverLine>, val requestedKind: String) {
         private fun platform(text: String): CoverPlatform? {
             val clean = normalized(text)
             if (clean.length !in 3..40) return null
+            // These names are also ordinary title words, OS names or fragments.
+            // Require explicit branding instead of deleting a line such as ODYSSEY.
+            if (clean in setOf("odyssey", "saturn", "pico", "amiga", "windows", "linux", "android", "ios", "macos", "arcade", "playdate")) return null
             FieldChoices.brandFor(text)?.let { brand ->
                 val exact = FieldChoices.platforms.firstOrNull { it.name.equals(text.trim(), true) }
                 val alias = when (clean) { "switch" -> "Nintendo Switch"; "ps5" -> "PlayStation 5"; "ps4" -> "PlayStation 4"; "ps3" -> "PlayStation 3"; "ps2" -> "PlayStation 2"; "ps1" -> "PlayStation"; "snes" -> "Super Nintendo Entertainment System"; "nes" -> "Nintendo Entertainment System"; "n64" -> "Nintendo 64"; "gamecube" -> "Nintendo GameCube"; "psp" -> "PlayStation Portable"; else -> null }
@@ -42,7 +45,11 @@ class CoverEvidence(val lines: List<CoverLine>, val requestedKind: String) {
     }
     val detectedPlatform: CoverPlatform? = lines.asSequence().take(8).mapNotNull { platform(it.text) }.firstOrNull()
     val kind get() = if (detectedPlatform != null) "Game" else requestedKind
-    private fun branding(text: String) = platform(text) != null || FieldChoices.brands.any { normalized(it.value) == normalized(text) }
+    private fun branding(text: String): Boolean {
+        val match = platform(text)
+        return (match != null && (detectedPlatform == null || detectedPlatform.name == match.name)) ||
+            (kind == "Game" && FieldChoices.brands.any { normalized(it.value) == normalized(text) })
+    }
     private fun noise(text: String) = text.trim().matches(Regex("(?i)(PEGI\\s*\\d+|[0-9]{1,2}\\+?|ESRB|PAL|NTSC|DVD|BLU[- ]?RAY|4K UHD|www\\..*|https?://.*|[©®™].*)"))
     val titleLines: List<CoverLine> get() = lines.filter { it.text.trim().length in 3..200 && !branding(it.text) && !noise(it.text) }
         .sortedWith(compareByDescending<CoverLine> { it.height }.thenBy { it.order })
