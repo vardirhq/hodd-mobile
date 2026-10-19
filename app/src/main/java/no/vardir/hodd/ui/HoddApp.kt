@@ -122,7 +122,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                 when (page) {
                     "home" -> HomeScreen(catalog, query, { query = it }, ::openCollection, ::openItem, { collectionId = null; page = "collection" }, { newCollection = true }, vm::loadExamples, vm.repository::photo)
                     "collections" -> CollectionsScreen(catalog, ::openCollection, { newCollection = true })
-                    "collection", "wishlist" -> ItemsScreen(catalog, if (page == "wishlist") null else collection, page == "wishlist", query, { query = it }, ::openItem, ::addItem, vm.repository::photo)
+                    "collection", "wishlist" -> ItemsScreen(catalog, if (page == "wishlist") null else collection, page == "wishlist", query, { query = it }, ::openItem, ::addItem, vm.repository::photo, busy, vm::addSavedView, vm::removeSavedView)
                     "detail" -> if (item != null) ItemDetail(item, catalog.collections.find { it.id == item.collectionId }?.name.orEmpty(), vm.repository.photo(item.photoName), { page = "edit" }, { vm.deleteItem(item.id) { page = detailReturn } }, busy)
                     "edit" -> ItemEditor(item, catalog.collections, collectionId, busy, vm.repository::photo, { uri, done -> vm.photo(uri, done) }, { saved -> vm.save(saved) { itemId = saved.id; collectionId = saved.collectionId; page = "detail" } }, { back() }, { message -> scope.launch { snack.showSnackbar(message) } }, savedItems = catalog.items)
                 }
@@ -205,12 +205,23 @@ private fun CollectionsScreen(catalog: Catalog, open: (Collection) -> Unit, crea
 }
 
 @Composable
-private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boolean, query: String, onQuery: (String) -> Unit, open: (CatalogItem) -> Unit, add: () -> Unit, photo: (String?) -> File?) {
+private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boolean, query: String, onQuery: (String) -> Unit, open: (CatalogItem) -> Unit, add: () -> Unit, photo: (String?) -> File?, busy: Boolean, saveView: (String, String?, String, String, ItemStatus?, () -> Unit) -> Unit, removeView: (String, () -> Unit) -> Unit) {
     var filterName by rememberSaveable(collection?.id, wishlist) { mutableStateOf("All") }
     val status = if (wishlist) ItemStatus.WANTED else ItemStatus.entries.find { it.label == filterName }
     var tagFilter by rememberSaveable(collection?.id, wishlist) { mutableStateOf("") }
     var locationFilter by rememberSaveable(collection?.id, wishlist) { mutableStateOf("") }
     var sortBy by rememberSaveable(collection?.id, wishlist) { mutableStateOf("Newest") }
+    var selectedView by rememberSaveable(collection?.id, wishlist) { mutableStateOf<String?>(null) }
+    var namingView by rememberSaveable { mutableStateOf(false) }
+    var viewName by rememberSaveable { mutableStateOf("") }
+    val activeView = catalog.savedViews.find { it.id == selectedView }
+    LaunchedEffect(activeView?.id) {
+        if (activeView != null) {
+            tagFilter = activeView.tag
+            locationFilter = activeView.location
+            filterName = activeView.status?.label ?: "All"
+        }
+    }
     val available = catalog.items.filter { collection == null || it.collectionId == collection.id }
     val tags = available.flatMap { it.tags }.distinct().sorted()
     val locations = available.map { it.location }.filter { it.isNotBlank() }.distinct().sorted()
@@ -223,6 +234,24 @@ private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boo
         "Oldest" -> filtered.sortedBy { it.addedAt }
         "Release year" -> filtered.sortedWith(compareByDescending<CatalogItem> { it.releaseYear.toIntOrNull() ?: 0 }.thenBy { it.title })
         else -> filtered
+    }
+    if (namingView) {
+        AlertDialog(
+            onDismissRequest = { namingView = false },
+            title = { Text("Save filtered view") },
+            text = {
+                Column {
+                    OutlinedTextField(viewName, { viewName = it.take(80) }, label = { Text("View name") }, singleLine = true)
+                    Text("Saved views update automatically when matching items change.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    saveView(viewName, collection?.id, tagFilter, locationFilter, status) { namingView = false }
+                }, enabled = viewName.isNotBlank() && !busy) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { namingView = false }) { Text("Cancel") } },
+        )
     }
     LazyColumn(contentPadding = PaddingValues(22.dp, 12.dp, 22.dp, 110.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Text(if (wishlist) "The next find" else collection?.name ?: "All items", style = MaterialTheme.typography.headlineLarge) }
@@ -259,6 +288,47 @@ private fun ItemsScreen(catalog: Catalog, collection: Collection?, wishlist: Boo
             androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(listOf("Newest", "Oldest", "Title", "Release year")) { order ->
                     FilterChip(selected = sortBy == order, onClick = { sortBy = order }, label = { Text(order) })
+                }
+            }
+        }
+        if (!wishlist) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Saved views", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewName = ""; namingView = true }, enabled = !busy) { Text("Save current filters") }
+                }
+                if (catalog.savedViews.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(catalog.savedViews.filter { it.collectionId == null || it.collectionId == collection?.id }) { view ->
+                            FilterChip(
+                                selected = selectedView == view.id,
+                                onClick = {
+                                    if (selectedView == view.id) {
+                                        selectedView = null
+                                        tagFilter = ""
+                                        locationFilter = ""
+                                        filterName = "All"
+                                    } else {
+                                        selectedView = view.id
+                                        tagFilter = view.tag
+                                        locationFilter = view.location
+                                        filterName = view.status?.label ?: "All"
+                                    }
+                                },
+                                label = { Text(view.name) },
+                            )
+                        }
+                    }
+                    if (activeView != null) {
+                        TextButton(onClick = {
+                            removeView(activeView.id) {
+                                selectedView = null
+                                tagFilter = ""
+                                locationFilter = ""
+                                filterName = "All"
+                            }
+                        }, enabled = !busy) { Text("Delete selected view") }
+                    }
                 }
             }
         }
