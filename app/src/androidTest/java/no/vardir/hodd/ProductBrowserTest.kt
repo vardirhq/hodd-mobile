@@ -26,7 +26,7 @@ class ProductBrowserTest {
     private val url = "https://shop.example/item"
     @Volatile private var result: List<ProductPreview>? = null
     @Volatile private var closed = false
-    private lateinit var pageView: WebView
+    @Volatile private var pageView: WebView? = null
     private fun open(html: String) {
         compose.setContent { HoddTheme {
             var visible by remember { mutableStateOf(true) }
@@ -38,7 +38,22 @@ class ProductBrowserTest {
                     WebResourceResponse("text/html", "UTF-8", ByteArrayInputStream(body.toByteArray(Charsets.UTF_8)))
                 })
         } }
-        compose.waitUntil(15000) { compose.onAllNodesWithText("Import this product").fetchSemanticsNodes().any { !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled) } }
+        try {
+            compose.waitUntil(15000) { compose.onAllNodesWithText("Import this product").fetchSemanticsNodes().any { !it.config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled) } }
+        } catch (failure: Throwable) {
+            val folder = File(compose.activity.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            File(folder, "24-store-browser-load-failure.png").outputStream().use {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            compose.onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().forEach { node ->
+                println("Browser semantics: " + node.children.map { it.config.toString() })
+            }
+            compose.runOnIdle {
+                println("Browser fixture view=" + (pageView?.url ?: "no intercepted request") + " progress=" + pageView?.progress)
+                pageView?.evaluateJavascript("JSON.stringify({url:location.href,title:document.title,body:document.body?document.body.innerText:''})") { println("Browser fixture document: " + it) }
+            }
+            throw failure
+        }
     }
     @Test fun importsJavascriptGeneratedMetadataFromDisplayedPage() {
         open("""<html><head><title>Loading</title><script>
@@ -52,7 +67,7 @@ class ProductBrowserTest {
             val metrics = compose.activity.windowManager.currentWindowMetrics
             val bars = metrics.windowInsets.getInsets(android.view.WindowInsets.Type.navigationBars())
             assertTrue("This regression must run with visible Android navigation controls", bars.bottom > 0)
-            val origin = IntArray(2); pageView.rootView.getLocationOnScreen(origin)
+            val origin = IntArray(2); pageView!!.rootView.getLocationOnScreen(origin)
             assertTrue("Import button must sit above Android navigation", button.boundsInWindow.bottom + origin[1] <= metrics.bounds.bottom - bars.bottom)
         }
         val folder = File(compose.activity.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
