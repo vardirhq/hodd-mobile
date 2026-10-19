@@ -105,32 +105,35 @@ internal fun PhotoEditor(source: File, onAccepted: (String) -> Unit, onCancel: (
             }
         } },
     ) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets)) {
-            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                if (preview != null) CropPreview(preview, crop, brightness, contrast, !saving, ::setCrop)
-                else if (error != null) Text(error!!, Modifier.padding(20.dp))
-                else CircularProgressIndicator(Modifier.padding(20.dp))
-            }
-            Column(Modifier.fillMaxWidth().heightIn(max = 280.dp).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp)) {
-                Text("Drag the corners to crop. Drag inside the frame to move it.", style = MaterialTheme.typography.bodySmall, color = Muted)
-                Text("Brightness · ${(brightness * 100).roundToInt()}", style = MaterialTheme.typography.labelLarge)
-                Slider(brightness, { brightness = it }, valueRange = -0.5f..0.5f, enabled = !saving,
-                    modifier = Modifier.testTag("photo-brightness").semantics { contentDescription = "Brightness" })
-                Text("Contrast · ${(contrast * 100).roundToInt()}%", style = MaterialTheme.typography.labelLarge)
-                Slider(contrast, { contrast = it }, valueRange = 0.5f..2f, enabled = !saving,
-                    modifier = Modifier.testTag("photo-contrast").semantics { contentDescription = "Contrast" })
-                TextButton(onClick = { precise = !precise }, enabled = !saving, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (precise) "Hide crop controls" else "Precise crop controls")
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
+            val controlsHeight = minOf(280.dp, maxHeight * 0.48f)
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    if (preview != null) CropPreview(preview, crop, brightness, contrast, !saving, ::setCrop)
+                    else if (error != null) Text(error!!, Modifier.padding(20.dp))
+                    else CircularProgressIndicator(Modifier.padding(20.dp))
                 }
-                if (precise) {
-                    Text("Horizontal crop", style = MaterialTheme.typography.labelLarge)
-                    RangeSlider(left..right, { range ->
-                        if (range.endInclusive - range.start >= PhotoCrop.MIN_SIZE) setCrop(PhotoCrop(range.start, top, range.endInclusive, bottom))
-                    }, enabled = !saving, modifier = Modifier.semantics { contentDescription = "Horizontal crop" })
-                    Text("Vertical crop", style = MaterialTheme.typography.labelLarge)
-                    RangeSlider(top..bottom, { range ->
-                        if (range.endInclusive - range.start >= PhotoCrop.MIN_SIZE) setCrop(PhotoCrop(left, range.start, right, range.endInclusive))
-                    }, enabled = !saving, modifier = Modifier.semantics { contentDescription = "Vertical crop" })
+                Column(Modifier.fillMaxWidth().heightIn(max = controlsHeight).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 8.dp)) {
+                    Text("Drag the corners to crop. Drag inside the frame to move it.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("Brightness · ${(brightness * 100).roundToInt()}", style = MaterialTheme.typography.labelLarge)
+                    Slider(brightness, { brightness = it }, valueRange = -0.5f..0.5f, enabled = !saving,
+                        modifier = Modifier.testTag("photo-brightness").semantics { contentDescription = "Brightness" })
+                    Text("Contrast · ${(contrast * 100).roundToInt()}%", style = MaterialTheme.typography.labelLarge)
+                    Slider(contrast, { contrast = it }, valueRange = 0.5f..2f, enabled = !saving,
+                        modifier = Modifier.testTag("photo-contrast").semantics { contentDescription = "Contrast" })
+                    TextButton(onClick = { precise = !precise }, enabled = !saving, contentPadding = PaddingValues(0.dp)) {
+                        Text(if (precise) "Hide crop controls" else "Precise crop controls")
+                    }
+                    if (precise) {
+                        Text("Horizontal crop", style = MaterialTheme.typography.labelLarge)
+                        RangeSlider(left..right, { range ->
+                            if (range.endInclusive - range.start >= PhotoCrop.MIN_SIZE) setCrop(PhotoCrop(range.start, top, range.endInclusive, bottom))
+                        }, enabled = !saving, modifier = Modifier.semantics { contentDescription = "Horizontal crop" })
+                        Text("Vertical crop", style = MaterialTheme.typography.labelLarge)
+                        RangeSlider(top..bottom, { range ->
+                            if (range.endInclusive - range.start >= PhotoCrop.MIN_SIZE) setCrop(PhotoCrop(left, range.start, right, range.endInclusive))
+                        }, enabled = !saving, modifier = Modifier.semantics { contentDescription = "Vertical crop" })
+                    }
                 }
             }
         }

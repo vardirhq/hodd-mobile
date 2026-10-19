@@ -15,6 +15,11 @@ import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import no.vardir.hodd.ui.PhotoEditor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsActions
@@ -153,6 +158,19 @@ class PhotoEditingTest {
         compose.onNodeWithText("Save changes").performClick()
         assertEquals(source.name, saved!!.photoName); assertEquals(before, digest(source))
     }
+    @Test fun shortEditorKeepsPreviewAndSaveVisibleAndCropControlsReachable() {
+        val source = image()
+        compose.setContent { HoddTheme { Box(Modifier.height(320.dp)) {
+            PhotoEditor(source, onAccepted = {}, onCancel = {}, message = {})
+        } } }
+        waitForPreview()
+        assertTrue(compose.onNodeWithTag("photo-crop-preview").fetchSemanticsNode().boundsInRoot.height > 40f)
+        compose.onNodeWithText("Use photo").assertIsDisplayed()
+        compose.onNodeWithText("Precise crop controls").performScrollTo().performClick()
+        compose.onNodeWithText("Vertical crop").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Use photo").assertIsDisplayed()
+    }
+
     private fun registry(camera: Boolean) = object : ActivityResultRegistry() {
         override fun <I, O> onLaunch(requestCode: Int, contract: ActivityResultContract<I, O>, input: I, options: ActivityOptionsCompat?) {
             val result: Any = when (contract) {
