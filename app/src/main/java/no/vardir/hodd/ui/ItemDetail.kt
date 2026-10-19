@@ -39,7 +39,7 @@ internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edi
     var identifiersOpen by rememberSaveable(item.id) { mutableStateOf(false) }
     val attributeLabels = mapOf(
         "isbn" to "ISBN", "pages" to "Pages", "binding" to "Binding", "platform" to "Platform",
-        "developer" to "Developer", "region" to "Region", "edition" to "Edition", "director" to "Director",
+        "platformBrand" to "Platform brand", "developer" to "Developer", "region" to "Region", "edition" to "Edition", "director" to "Director",
         "runtime" to "Runtime", "resolution" to "Resolution", "label" to "Record label",
         "catalogNumber" to "Catalog number", "tracks" to "Tracks", "country" to "Country",
         "denomination" to "Denomination", "mintYear" to "Mint year", "mintMark" to "Mint mark", "material" to "Material",

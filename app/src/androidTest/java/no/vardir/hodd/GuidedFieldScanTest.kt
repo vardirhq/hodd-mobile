@@ -80,7 +80,7 @@ class GuidedFieldScanTest {
         compose.onNodeWithText("Insert into Creator. Other fields will stay as they are.").assertExists()
         compose.onNodeWithText("INSIDE FRAME").performClick()
         compose.onNodeWithText("Creator / author").assertTextContains("INSIDE FRAME")
-        compose.onNodeWithText("Publisher / label").performScrollTo().assertTextContains("Original publisher")
+        compose.onNodeWithTag("choice-publisher").performScrollTo().assertTextContains("Original publisher")
     }
 
     @Test fun editorCameraKeepsCaptureAboveButtonNavigationAndCanCapture() {

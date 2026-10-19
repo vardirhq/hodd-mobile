@@ -4,6 +4,18 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-10-19
+
+### Added
+- Offline searchable choices for formats, publishers, languages, release years, condition and category-specific details.
+- Game platform selection by brand, including current and legacy systems, search aliases and confirmation before clearing an existing platform.
+- Movie region choices by format and coin denomination suggestions by country.
+- Custom-value dialogs and reusable values from saved items, without rewriting existing custom or fetched text.
+- Bundled brand/platform logos with source and license notices, plus fallback icons.
+
+### Fixed
+- Category-specific draft attributes now survive activity recreation.
+
 ## [0.1.0-alpha.2] - 2026-10-19
 
 ### Added

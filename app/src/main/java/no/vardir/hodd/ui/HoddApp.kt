@@ -123,7 +123,7 @@ fun HoddApp(vm: HoddViewModel = viewModel()) {
                     "collections" -> CollectionsScreen(catalog, ::openCollection, { newCollection = true })
                     "collection", "wishlist" -> ItemsScreen(catalog, if (page == "wishlist") null else collection, page == "wishlist", query, { query = it }, ::openItem, ::addItem, vm.repository::photo)
                     "detail" -> if (item != null) ItemDetail(item, catalog.collections.find { it.id == item.collectionId }?.name.orEmpty(), vm.repository.photo(item.photoName), { page = "edit" }, { vm.deleteItem(item.id) { page = detailReturn } }, busy)
-                    "edit" -> ItemEditor(item, catalog.collections, collectionId, busy, vm.repository::photo, { uri, done -> vm.photo(uri, done) }, { saved -> vm.save(saved) { itemId = saved.id; collectionId = saved.collectionId; page = "detail" } }, { back() }, { message -> scope.launch { snack.showSnackbar(message) } })
+                    "edit" -> ItemEditor(item, catalog.collections, collectionId, busy, vm.repository::photo, { uri, done -> vm.photo(uri, done) }, { saved -> vm.save(saved) { itemId = saved.id; collectionId = saved.collectionId; page = "detail" } }, { back() }, { message -> scope.launch { snack.showSnackbar(message) } }, savedItems = catalog.items)
                 }
             }
         }

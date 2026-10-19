@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +29,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.Collection
+import no.vardir.hodd.core.FieldChoices
+import no.vardir.hodd.core.FieldChoice
 import no.vardir.hodd.core.ItemStatus
 import no.vardir.hodd.core.withSuggestion
 import no.vardir.hodd.data.LocalItemAssistant
@@ -42,6 +45,7 @@ internal fun ItemEditor(
     existing: CatalogItem?, collections: List<Collection>, preferredCollectionId: String?, busy: Boolean,
     photo: (String?) -> File?, importPhoto: (Uri, (String?) -> Unit) -> Unit,
     save: (CatalogItem) -> Unit, cancel: () -> Unit, message: (String) -> Unit,
+    savedItems: List<CatalogItem> = emptyList(),
     fieldCamera: @Composable (String, File, (File) -> Unit, () -> Unit, (String) -> Unit) -> Unit = { field, file, captured, cancelled, error ->
         GuidedFieldCamera(field, file, captured, cancelled, error)
     },
@@ -81,7 +85,8 @@ internal fun ItemEditor(
     var language by rememberSaveable(draftId) { mutableStateOf(existing?.language.orEmpty()) }
     var releaseYear by rememberSaveable(draftId) { mutableStateOf(existing?.releaseYear.orEmpty()) }
     var condition by rememberSaveable(draftId) { mutableStateOf(existing?.condition.orEmpty()) }
-    var attributes by remember(draftId) { mutableStateOf(existing?.attributes.orEmpty()) }
+    var attributes by rememberSaveable(draftId, stateSaver = AttributeSaver) { mutableStateOf(existing?.attributes.orEmpty()) }
+    var pendingBrand by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val status = ItemStatus.valueOf(statusName)
     val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes)
@@ -201,10 +206,12 @@ internal fun ItemEditor(
                 Box(Modifier.weight(1f)) { OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
                 scanAction("Creator")
             }
-            ChoiceMenu("Collection", collections.find { it.id == selectedCollection }?.name.orEmpty(), collections.map { it.id to it.name }) { selectedCollection = it }
-            ChoiceMenu("Type", kind, listOf("Book", "Game", "Movie", "Vinyl", "CD", "Comic", "Coin", "Other").map { it to it }) { kind = it }
+            val canChoose = !busy && !assisting && !importing
+            SearchableChoice("collection", "Collection", selectedCollection, collections.map { FieldChoice(it.id, it.name) }, enabled = canChoose, optional = false, custom = false) { selectedCollection = it }
+            SearchableChoice("kind", "Type", kind, FieldChoices.kinds, enabled = canChoose, optional = false, custom = false) { kind = it }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(format, { format = it }, label = { Text("Format / edition") }, placeholder = { Text("Hardback, cartridge, first edition…") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { SearchableChoice("format", "Format / edition", format, FieldChoices.formats(kind), enabled = canChoose,
+                    saved = savedItems.filter { it.kind == kind }.map { it.format }) { format = it } }
                 scanAction("Format")
             }
             Text("Additional details", style = MaterialTheme.typography.titleLarge)
@@ -221,31 +228,62 @@ internal fun ItemEditor(
                 scanAction("Volume")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(publisher, { publisher = it }, label = { Text("Publisher / label") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { SearchableChoice("publisher", "Publisher / label", publisher, FieldChoices.publishers, enabled = canChoose, saved = savedItems.map { it.publisher }) { publisher = it } }
                 scanAction("Publisher")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(language, { language = it }, label = { Text("Language") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { SearchableChoice("language", "Language", language, FieldChoices.languages, enabled = canChoose, saved = savedItems.map { it.language }) { language = it } }
                 scanAction("Language")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { SearchableChoice("releaseYear", "Release year", releaseYear, (java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) + 2 downTo 1800).map { FieldChoice(it.toString()) }, enabled = canChoose, saved = savedItems.map { it.releaseYear }) { releaseYear = it } }
                 scanAction("Release year")
             }
-            OutlinedTextField(condition, { condition = it }, label = { Text("Condition") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            SearchableChoice("condition", "Condition", condition, FieldChoices.conditions, enabled = canChoose, saved = savedItems.map { it.condition }) { condition = it }
             val categoryFields = when (kind) {
                 "Book", "Comic" -> listOf("isbn" to "ISBN", "pages" to "Page count", "binding" to "Binding")
-                "Game" -> listOf("platform" to "Platform", "developer" to "Developer", "region" to "Region", "edition" to "Edition")
+                "Game" -> listOf("platformBrand" to "Platform brand", "platform" to "Platform", "developer" to "Developer", "region" to "Region", "edition" to "Edition")
                 "Movie" -> listOf("director" to "Director", "runtime" to "Runtime", "region" to "Region", "resolution" to "Resolution")
                 "Vinyl", "CD" -> listOf("label" to "Record label", "catalogNumber" to "Catalog number", "tracks" to "Track count")
                 "Coin" -> listOf("country" to "Country", "denomination" to "Denomination", "mintYear" to "Mint year", "mintMark" to "Mint mark", "material" to "Material")
                 else -> emptyList()
             }
             if (categoryFields.isNotEmpty()) Text("$kind details", style = MaterialTheme.typography.titleLarge)
+            fun attribute(key: String, value: String) {
+                attributes = attributes.toMutableMap().apply { if (value.isBlank()) remove(key) else put(key, value.take(300)) }
+            }
+            val platformBrand = attributes["platformBrand"].orEmpty().ifBlank { FieldChoices.brandFor(attributes["platform"].orEmpty()).orEmpty() }
             categoryFields.forEach { (key, label) ->
-                OutlinedTextField(attributes[key].orEmpty(), { value ->
-                    attributes = attributes.toMutableMap().apply { if (value.isBlank()) remove(key) else put(key, value.take(300)) }
-                }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                val options = when (key) {
+                    "platformBrand" -> FieldChoices.brands
+                    "platform" -> FieldChoices.platformsFor(platformBrand)
+                    "binding" -> FieldChoices.bindings
+                    "developer" -> FieldChoices.developers
+                    "region" -> FieldChoices.regions(kind, format)
+                    "edition" -> FieldChoices.editions
+                    "resolution" -> FieldChoices.resolutions
+                    "label" -> FieldChoices.publishers
+                    "country" -> FieldChoices.countries
+                    "material" -> FieldChoices.materials
+                    "denomination" -> FieldChoices.denominations(attributes["country"].orEmpty())
+                    "mintYear" -> (java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) downTo 1800).map { FieldChoice(it.toString()) }
+                    else -> null
+                }
+                if (options != null) SearchableChoice(key, label, if (key == "platformBrand") platformBrand else attributes[key].orEmpty(), options,
+                    enabled = canChoose && (key != "platform" || platformBrand.isNotBlank() || !attributes["platform"].isNullOrBlank()),
+                    supporting = when {
+                        key == "platform" && platformBrand.isBlank() -> "Choose a brand first, or keep your existing platform."
+                        key == "denomination" -> "Suggestions follow the selected country. Use Custom for historical denominations or currencies."
+                        key == "region" && kind == "Movie" -> "Choices depend on the selected movie format. Check the region printed on your edition."
+                        else -> null
+                    },
+                    saved = savedItems.filter { it.kind == kind && (key != "platform" || it.attributes["platformBrand"].orEmpty().ifBlank { FieldChoices.brandFor(it.attributes["platform"].orEmpty()).orEmpty() } == platformBrand) }.mapNotNull { it.attributes[key] },
+                ) { value ->
+                    if (key == "platformBrand" && value != platformBrand && !attributes["platform"].isNullOrBlank()) pendingBrand = value
+                    else attribute(key, value)
+                }
+                else OutlinedTextField(attributes[key].orEmpty(), { value -> attribute(key, value) }, label = { Text(label) },
+                    modifier = Modifier.fillMaxWidth(), enabled = canChoose, singleLine = true)
             }
             ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing, apply = { suggestion, replace, downloadedCover ->
                 val next = draft.withSuggestion(suggestion, replace)
@@ -288,15 +326,18 @@ internal fun ItemEditor(
         },
         confirmButton = { TextButton(onClick = { scanResults = emptyList() }) { Text("Cancel") } }
     )
+    pendingBrand?.let { brand ->
+        AlertDialog(onDismissRequest = { pendingBrand = null }, title = { Text("Change platform brand?") },
+            text = { Text("Changing the brand clears ${attributes["platform"]} so you can choose another platform. Other details are kept.") },
+            confirmButton = { TextButton(onClick = {
+                attributes = attributes.toMutableMap().apply { remove("platform"); if (brand.isBlank()) remove("platformBrand") else put("platformBrand", brand) }
+                pendingBrand = null
+            }) { Text("Change brand") } },
+            dismissButton = { TextButton(onClick = { pendingBrand = null }) { Text("Keep platform") } })
+    }
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = cancel) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
 }
 
-@Composable
-private fun ChoiceMenu(label: String, selected: String, choices: List<Pair<String, String>>, choose: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = Muted)
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(selected, Modifier.weight(1f)); Icon(Icons.Outlined.ExpandMore, null) }
-        DropdownMenu(expanded, { expanded = false }) { choices.forEach { (id, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { choose(id); expanded = false }) } }
-    }
-}
+private val AttributeSaver = mapSaver<Map<String, String>>(
+    save = { it }, restore = { saved -> saved.mapValues { it.value as String } },
+)

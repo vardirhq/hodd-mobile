@@ -2,7 +2,7 @@
 
 A native Android home for the things you collect. Built with Kotlin and Jetpack Compose, inspired by [Hodd for desktop](https://github.com/vardirhq/hodd).
 
-**Early development · 0.1.0-alpha.2** — the initial offline collection flows are implemented. This is not a production release.
+**Early development · 0.1.0-alpha.3** — the initial offline collection flows are implemented. This is not a production release.
 
 ## What you can do
 
@@ -10,6 +10,7 @@ A native Android home for the things you collect. Built with Kotlin and Jetpack 
 - Browse a home shelf and recent additions, then search across titles, creators, notes, formats, and barcodes.
 - Filter by owned, wanted, and lent out; see wanted items together in the wishlist.
 - Add, edit, and delete items, including edition, condition notes, borrower, and barcode.
+- Search offline field choices, select a game brand then platform, or add custom values.
 - Capture barcodes with the bundled scanner, enter them manually, take a cover photo, or choose one from your device.
 - Find book details by ISBN/title through Open Library, and CD/vinyl releases by barcode/title through MusicBrainz.
 - Review fetched details and optionally download artwork from Open Library or Cover Art Archive.
