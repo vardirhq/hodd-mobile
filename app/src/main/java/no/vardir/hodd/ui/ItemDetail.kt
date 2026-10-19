@@ -2,6 +2,7 @@ package no.vardir.hodd.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -56,6 +57,7 @@ internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edi
         .filterValues { it.isNotBlank() }.map { (key, value) ->
             DetailFact(attributeLabels[key] ?: key.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() }, value)
         }
+    val organization = item.location.isNotBlank() || item.tags.isNotEmpty()
     val hasIdentifiers = item.barcode.isNotBlank() || item.attributes["isbn"].orEmpty().isNotBlank() || item.metadataSource.isNotBlank() || item.metadataId.isNotBlank() || item.metadataUrl.isNotBlank()
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -117,17 +119,56 @@ internal fun ItemDetail(item: CatalogItem, collection: String, photo: File?, edi
                     }
                 }
             }
+            if (organization) item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DetailSectionHeading("Your collection")
+                    Surface(shape = RoundedCornerShape(22.dp), color = Color(0xFFF0F2EC),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DetailGreen.copy(alpha = 0.12f))) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            if (item.location.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Outlined.Place, null, tint = DetailGreen, modifier = Modifier.size(20.dp))
+                                    Column {
+                                        Text("STORED AT", style = MaterialTheme.typography.labelSmall, color = DetailGreen, letterSpacing = 1.sp)
+                                        Text(item.location, style = MaterialTheme.typography.titleMedium, color = Ink)
+                                    }
+                                }
+                            }
+                            if (item.tags.isNotEmpty()) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    item.tags.forEach { tag ->
+                                        Surface(shape = RoundedCornerShape(50), color = Color.White,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, DetailGreen.copy(alpha = 0.18f))) {
+                                            Text(tag, Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                                style = MaterialTheme.typography.labelMedium, color = DetailGreen)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if (edition.isNotEmpty()) item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     DetailSectionHeading("About this edition")
-                    Surface(shape = RoundedCornerShape(22.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) {
-                        Column(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
-                            edition.forEachIndexed { index, fact ->
-                                Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Text(fact.label, style = MaterialTheme.typography.labelMedium, color = Muted)
-                                    Text(fact.value, style = MaterialTheme.typography.bodyLarge, color = Ink)
+                    Surface(shape = RoundedCornerShape(22.dp), color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Line)) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            edition.chunked(2).forEach { pair ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                                    pair.forEach { fact ->
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Text(fact.label, style = MaterialTheme.typography.labelMedium, color = Muted)
+                                            SelectionContainer {
+                                                Text(fact.value, style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium, color = Ink)
+                                            }
+                                        }
+                                    }
+                                    if (pair.size == 1) Spacer(Modifier.weight(1f))
                                 }
-                                if (index < edition.lastIndex) HorizontalDivider(color = Line.copy(alpha = 0.7f))
                             }
                         }
                     }
