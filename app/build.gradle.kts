@@ -68,6 +68,7 @@ if (releaseRequested) {
 }
 dependencies {
     implementation(project(":core"))
+    implementation("org.jsoup:jsoup:1.18.3")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.camera:camera-core:1.4.1")
     implementation("androidx.camera:camera-camera2:1.4.1")
