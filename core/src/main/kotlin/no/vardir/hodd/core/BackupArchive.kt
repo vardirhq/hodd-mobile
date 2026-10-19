@@ -38,7 +38,7 @@ object BackupArchive {
         val bytes = CatalogCodec.encode(catalog).toByteArray(Charsets.UTF_8)
         require(bytes.size <= MAX_CATALOG_BYTES) { "The catalog is too large for a backup." }
         CatalogCodec.decode(bytes.toString(Charsets.UTF_8))
-        val names = catalog.items.mapNotNull { it.photoName }.distinct().sorted()
+        val names = catalog.items.flatMap { listOfNotNull(it.photoName) + it.photoNames }.distinct().sorted()
         require(names.size + 2 <= MAX_ENTRIES) { "The backup has too many photos." }
         val hashes = linkedMapOf<String, String>()
         var total = 0L
@@ -115,7 +115,7 @@ object BackupArchive {
             require(manifest.formatVersion == 1) { "This backup needs a newer version of Hodd." }
             require(manifest.entries == hashes.filterKeys { it != "manifest.json" }) { "Backup checksum mismatch. No collection data was replaced." }
             val catalog = CatalogCodec.decode(File(destination, "catalog.json").readText())
-            val expected = catalog.items.mapNotNull { it.photoName }.map { "photos/$it" }.toSet() + "catalog.json"
+            val expected = catalog.items.flatMap { listOfNotNull(it.photoName) + it.photoNames }.map { "photos/$it" }.toSet() + "catalog.json"
             require(expected == manifest.entries.keys) { "The backup is missing photos or contains unreferenced files." }
             return StagedBackup(destination, catalog, manifest)
         } catch (error: Exception) {
