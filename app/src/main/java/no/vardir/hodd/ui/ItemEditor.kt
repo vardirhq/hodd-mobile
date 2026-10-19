@@ -237,7 +237,8 @@ internal fun ItemEditor(
                             var temp: File? = null
                             try {
                                 val bytes = ProductLinkImporter.downloadImage(found.imageUrl)
-                                temp = File(context.cacheDir, "hodd-product-${UUID.randomUUID()}.jpg")
+                                temp = File(context.filesDir, "photos/hodd-product-${UUID.randomUUID()}.jpg")
+                                temp.parentFile?.mkdirs()
                                 temp.writeBytes(bytes)
                                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", temp)
                                 importing = true
@@ -247,12 +248,12 @@ internal fun ItemEditor(
                                         photoName = imported
                                     } else message("Product details imported, but the image could not be saved.")
                                     importing = false
+                                    temp?.delete()
                                 }
                             } catch (error: Exception) {
                                 if (error is CancellationException) throw error
                                 message("Product details imported, but the image could not be downloaded.")
                             } finally {
-                                temp?.delete()
                                 fetchingProduct = false
                             }
                         }
