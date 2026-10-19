@@ -86,7 +86,7 @@ class CatalogTest {
         assertEquals("Shelf A", restored.items.single().location)
         assertEquals(1, restored.search("sealed").size)
         assertEquals(1, restored.search("shelf").size)
-        assertFailsWith<IllegalArgumentException> { empty.save(item().copy(tags = List(31) { "tag$" + "it" })) }
+        assertFailsWith<IllegalArgumentException> { empty.save(item().copy(tags = List(31) { "tag" + it })) }
     }
 
     @Test fun `saved views dynamically filter and survive serialization`() {
