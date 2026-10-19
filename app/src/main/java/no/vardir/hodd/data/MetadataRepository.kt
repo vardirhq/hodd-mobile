@@ -9,6 +9,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import no.vardir.hodd.core.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -25,10 +28,11 @@ class MetadataRepository(private val context: Context, private val transport: ((
         private const val USER_AGENT = "HoddMobile/0.1 (https://github.com/vardirhq/hodd-mobile)"
     }
 
-    suspend fun lookup(kind: String, barcode: String, title: String, creator: String): List<ItemSuggestion> = withContext(Dispatchers.IO) {
+    suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String = ""): List<ItemSuggestion> = withContext(Dispatchers.IO) {
         val code = cleanBarcode(barcode)
+        if (kind in listOf("Game", "Movie")) return@withContext lookupWikidata(kind, title, platform)
         val music = kind in listOf("Vinyl", "CD", "Music")
-        require(music || kind in listOf("Book", "Comic")) { "Online lookup currently supports books and music. Use a cover photo or enter details for this type." }
+        require(music || kind in listOf("Book", "Comic")) { "Online lookup supports books, music, games and movies. Use a cover photo or enter details for this type." }
         require(code.isNotBlank() || title.isNotBlank()) { "Scan a barcode or enter a title to search." }
         if (code.isNotBlank() && title.isBlank()) require(if (music) isGtin(code) else isIsbn(code)) { "${if (music) "Barcode" else "ISBN"} check digit is invalid. Check the code or clear it to search by title." }
         fun encode(value: String) = URLEncoder.encode(value, "UTF-8")
@@ -57,6 +61,47 @@ class MetadataRepository(private val context: Context, private val transport: ((
                 cache.writeText(SuggestionCodec.encode(results))
                 cacheDir.listFiles()?.sortedByDescending(File::lastModified)?.drop(100)?.forEach(File::delete)
             } catch (_: IOException) { /* Re-fetch next time if device storage is full. */ }
+            results
+        }
+    }
+
+    private suspend fun lookupWikidata(kind: String, title: String, platform: String): List<ItemSuggestion> {
+        require(title.isNotBlank()) { "Enter or recognize a title first. Wikidata cannot search by EAN." }
+        val query = title.trim().take(300)
+        val cacheDir = File(context.cacheDir, "metadata").apply { mkdirs() }
+        val key = MessageDigest.getInstance("SHA-256").digest(("wikidata-v1|$kind|$query|$platform").toByteArray()).joinToString("") { "%02x".format(it) }
+        val cache = File(cacheDir, "$key.json")
+        return requestLock.withLock {
+            if (cache.exists() && System.currentTimeMillis() - cache.lastModified() < 24L * 60 * 60 * 1000) {
+                try { return@withLock SuggestionCodec.decode(cache.readText()) } catch (_: Exception) { cache.delete() }
+            }
+            suspend fun request(parameters: String): String {
+                coroutineContext.ensureActive()
+                val elapsed = android.os.SystemClock.elapsedRealtime() - lastRequest
+                if (elapsed < 1100) delay(1100 - elapsed)
+                lastRequest = android.os.SystemClock.elapsedRealtime()
+                return readUrl("https://www.wikidata.org/w/api.php?format=json&$parameters", 1024 * 1024).toString(Charsets.UTF_8)
+            }
+            val candidates = WikidataMetadata.searchIds(request("action=wbsearchentities&language=en&type=item&limit=8&search=${URLEncoder.encode(query, "UTF-8")}"))
+            val all = mutableMapOf<String, JsonObject>()
+            suspend fun load(ids: List<String>) {
+                ids.distinct().filter { it !in all }.chunked(50).forEach { chunk ->
+                    all.putAll(WikidataMetadata.entities(request("action=wbgetentities&languages=en%7Cmul&languagefallback=1&props=labels%7Caliases%7Cclaims&ids=${chunk.joinToString("%7C")}")))
+                }
+            }
+            if (candidates.isEmpty()) return@withLock emptyList()
+            load(candidates)
+            var types = candidates.flatMap { all[it]?.let { entity -> WikidataMetadata.ids(entity, "P31") }.orEmpty() }.distinct().take(40)
+            repeat(2) {
+                load(types)
+                types = types.flatMap { all[it]?.let { entity -> WikidataMetadata.ids(entity, "P279") }.orEmpty() }.distinct().take(40)
+            }
+            load(candidates.flatMap { all[it]?.let(WikidataMetadata::relatedIds).orEmpty() })
+            val results = WikidataMetadata.suggestions(candidates, all, kind, query, platform)
+            try {
+                cache.writeText(SuggestionCodec.encode(results))
+                cacheDir.listFiles()?.sortedByDescending(File::lastModified)?.drop(100)?.forEach(File::delete)
+            } catch (_: IOException) { /* Lookup remains usable without a writable cache. */ }
             results
         }
     }

@@ -91,6 +91,71 @@ class ItemAssistanceTest {
         assertNotEquals(results.first().sourceId, results.last().sourceId)
     }
 
+    private fun wikidataRepository(requested: MutableList<String>) = MetadataRepository(context) { url, _ ->
+        requested += url
+        assertTrue(url.startsWith("https://www.wikidata.org/w/api.php?"))
+        if (url.contains("wbsearchentities")) {
+            assertTrue(url.contains("search=SUPER+MARIO+MAKER+2"))
+            """{"search":[{"id":"Q61831178"}]}""".toByteArray()
+        } else {
+            """{"entities":{
+              "Q61831178":{"labels":{"en":{"value":"Super Mario Maker 2"}},"claims":{
+                "P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q7889"}}}}],
+                "P123":[{"mainsnak":{"datavalue":{"value":{"id":"Q8093"}}}}]}},
+              "Q7889":{"labels":{"en":{"value":"video game"}}},
+              "Q8093":{"labels":{"en":{"value":"Nintendo"}}}
+            }}""".toByteArray()
+        }
+    }
+
+    @Test fun gameLookupHydratesCanonicalFactsAndCachesEntireSearch() = runBlocking {
+        File(context.cacheDir, "metadata").deleteRecursively()
+        val requests = mutableListOf<String>()
+        val repository = wikidataRepository(requests)
+        val first = repository.lookup("Game", "not-an-ean", "SUPER MARIO MAKER 2", "", "Nintendo Switch")
+        assertEquals("Super Mario Maker 2", first.single().title)
+        assertEquals("Nintendo", first.single().publisher)
+        assertEquals("Wikidata", first.single().source)
+        val count = requests.size
+        assertTrue(count >= 2)
+        assertTrue(requests.none { it.contains("not-an-ean") })
+        assertEquals(first, repository.lookup("Game", "", "SUPER MARIO MAKER 2", "", "Nintendo Switch"))
+        assertEquals(count, requests.size)
+        try { repository.lookup("Game", "12345", "", ""); fail("Title required") }
+        catch (_: IllegalArgumentException) { }
+        assertEquals(count, requests.size)
+    }
+
+    @Test fun gameOnlineSearchRequiresMatchReviewAndExplicitApply() {
+        File(context.cacheDir, "metadata").deleteRecursively()
+        val requests = mutableListOf<String>()
+        val repository = wikidataRepository(requests)
+        val assistant = LocalItemAssistant(context, StubModel(LocalAiStatus.UNAVAILABLE))
+        var applied: ItemSuggestion? = null
+        compose.setContent {
+            HoddTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+                ItemAssistPanel(CatalogItem(collectionId = "shelf", title = "SUPER MARIO MAKER 2", kind = "Game"), null, true,
+                    apply = { suggestion, _, _ -> applied = suggestion }, working = {}, message = {},
+                    assistant = assistant, metadataRepository = repository)
+            } }
+        }
+        compose.onNodeWithText("Find and fill details").performClick()
+        compose.onNodeWithText("Find online").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
+        assertNull(applied)
+        compose.onNodeWithText("Super Mario Maker 2").performClick()
+        compose.onNodeWithText("Publisher: Nintendo").assertExists()
+        assertNull(applied)
+        val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(directory, "18-wikidata-review.png").outputStream().use {
+            compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        compose.onNodeWithText("Use details").performClick()
+        compose.waitUntil(5000) { applied != null }
+        assertEquals("Super Mario Maker 2", applied!!.title)
+        assertEquals("Nintendo", applied!!.publisher)
+    }
+
     @Test fun invalidCodeDoesNotMakeNetworkRequest() = runBlocking {
         val repository = MetadataRepository(context) { _, _ -> fail("Invalid ISBN should never be sent"); byteArrayOf() }
         try { repository.lookup("Book", "9780140328722", "", ""); fail("Expected validation error") }

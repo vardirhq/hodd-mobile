@@ -29,10 +29,11 @@ internal fun ItemAssistPanel(
     apply: (ItemSuggestion, Boolean, String?) -> Unit,
     working: (Boolean) -> Unit, message: (String) -> Unit,
     assistant: LocalItemAssistant? = null,
+    metadataRepository: MetadataRepository? = null,
 ) {
     val context = LocalContext.current
     val local = remember(assistant) { assistant ?: LocalItemAssistant(context.applicationContext) }
-    val metadata = remember { MetadataRepository(context.applicationContext) }
+    val metadata = remember(metadataRepository) { metadataRepository ?: MetadataRepository(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf(LocalAiStatus.CHECKING) }
     var running by remember { mutableStateOf(false) }
@@ -100,7 +101,7 @@ internal fun ItemAssistPanel(
                 }, enabled = enabled && !running && cover != null, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.DocumentScanner, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Read cover")
                 }
-                if (cover != null && draft.kind in listOf("Book", "Comic", "Vinyl", "CD")) {
+                if (cover != null && draft.kind in listOf("Book", "Comic", "Vinyl", "CD", "Game", "Movie")) {
                     OutlinedButton(onClick = {
                         task("Identifying cover and finding catalog matches…") {
                             val recognized = local.readCover(cover, draft.kind)
@@ -131,15 +132,15 @@ internal fun ItemAssistPanel(
                 }, enabled = enabled && !running && status == LocalAiStatus.AVAILABLE && description.isNotBlank()) { Text("Suggest from description") }
                 HorizontalDivider(color = Line)
                 Text("Free online lookup", style = MaterialTheme.typography.titleSmall)
-                Text("Books: Open Library. CDs/vinyl: MusicBrainz; artwork: Cover Art Archive. Online search prioritizes title and creator; barcode is a fallback. Only search terms are sent to the provider. Photos and notes stay on-device.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                Text("Games/movies: Wikidata (work-level facts). Books: Open Library. CDs/vinyl: MusicBrainz; artwork: Cover Art Archive. Online search prioritizes title and creator; barcode is a fallback. Only search terms are sent to the provider. Photos and notes stay on-device.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 Button(onClick = {
                     task("Finding matching items…") {
-                        val matches = metadata.lookup(draft.kind, draft.barcode, draft.title, draft.creator)
+                        val matches = metadata.lookup(draft.kind, draft.barcode, draft.title, draft.creator, draft.attributes["platform"].orEmpty())
                         if (matches.isEmpty()) message("No matching items found. Try a title search or enter details manually.")
                         else { recognizedText = ""; suggestions = matches; notice = "Choose a match, then review its details. Edition and cover availability can vary." }
                     }
-                }, enabled = enabled && !running && draft.kind in listOf("Book", "Comic", "Vinyl", "CD") && (draft.barcode.isNotBlank() || draft.title.isNotBlank()), modifier = Modifier.fillMaxWidth()) { Text("Find online") }
-                if (draft.kind !in listOf("Book", "Comic", "Vinyl", "CD")) Text("Online lookup is available for books and music. Local cover recognition works for every type.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                }, enabled = enabled && !running && draft.kind in listOf("Book", "Comic", "Vinyl", "CD", "Game", "Movie") && (draft.title.isNotBlank() || (draft.kind !in listOf("Game", "Movie") && draft.barcode.isNotBlank())), modifier = Modifier.fillMaxWidth()) { Text("Find online") }
+                if (draft.kind !in listOf("Book", "Comic", "Vinyl", "CD", "Game", "Movie")) Text("Online lookup is available for books, music, games and movies. Local cover recognition works for every type.", style = MaterialTheme.typography.bodySmall, color = Muted)
             }
             if (running) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -185,18 +186,19 @@ internal fun ItemAssistPanel(
                 item.attributes.filterValues { it.isNotBlank() }.forEach { (key, value) ->
                     Text("${key.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() }}: $value")
                 }
-                if (reviewKind in listOf("Book", "Comic", "Vinyl", "CD") && item.source !in listOf("Open Library", "MusicBrainz")) {
+                if (reviewKind in listOf("Book", "Comic", "Vinyl", "CD", "Game", "Movie") && item.source !in listOf("Open Library", "MusicBrainz", "Wikidata")) {
                     OutlinedButton(onClick = {
                         task("Finding catalog matches for the reviewed title…") {
-                            val matches = metadata.lookup(reviewKind, "", reviewTitle.trim(), reviewCreator.trim())
+                            val matches = metadata.lookup(reviewKind, "", reviewTitle.trim(), reviewCreator.trim(), item.attributes["platform"].orEmpty().ifBlank { draft.attributes["platform"].orEmpty() })
                             if (matches.isEmpty()) message("No catalog matches. You can correct the title or apply the reviewed details.")
                             else { selected = null; suggestions = matches; notice = "Matches for your reviewed search. Check the edition before applying." }
                         }
                     }, enabled = !running && reviewTitle.isNotBlank()) { Text("Find catalog matches") }
                 }
+                if (item.sourceUrl.isNotBlank()) Text(item.sourceUrl, style = MaterialTheme.typography.bodySmall, color = Violet)
                 Text("Source: ${item.source}", style = MaterialTheme.typography.bodySmall, color = Violet)
                 if (item.detail.isNotBlank()) Text(item.detail, style = MaterialTheme.typography.bodySmall)
-                Text("Empty fields are filled by default. Existing details and your photo are kept.", style = MaterialTheme.typography.bodySmall)
+                Text(if (item.source == "Wikidata") "Empty fields are filled by default. Matching titles adopt catalog capitalization; other existing details and your photo are kept." else "Empty fields are filled by default. Existing details and your photo are kept.", style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(replace, { replace = it }, enabled = !running)
                     Text("Replace existing details", style = MaterialTheme.typography.bodySmall)

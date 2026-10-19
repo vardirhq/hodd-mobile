@@ -4,6 +4,14 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] - 2026-10-19
+
+### Added
+- Keyless Wikidata search for games and movies from a reviewed cover identity or typed title.
+- Canonical catalog titles, publisher, series, earliest catalog release year, developer/director and supported game platform details, with source links and explicit review before applying.
+- Type, sequel-number and platform checks; ambiguous multiplatform works do not guess a physical edition.
+- Rate-limited, bounded requests and a 24-hour results cache. Photos and notes stay local.
+
 ## [0.1.0-alpha.4] - 2026-10-19
 
 ### Changed

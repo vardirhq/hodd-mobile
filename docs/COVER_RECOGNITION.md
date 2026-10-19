@@ -19,7 +19,13 @@ A recognized platform can suggest Game even when the form starts on Book. Image 
 
 ## Online searches
 
-Identify and find online now opens local recognition/review first. It does not immediately search from the first model response. Find catalog matches uses the reviewed title, creator and supported type (books/comics or music). It sends those search terms, never the photo or raw cover text. Game metadata still has no online provider until a suitable integration is configured.
+Identify and find online now opens local recognition/review first. It does not immediately search from the first model response. Find catalog matches uses the reviewed title, creator and supported type. Books/comics use Open Library; CDs/vinyl use MusicBrainz. Games and movies now use Wikidata's public Action API without an account, API key or hosted proxy. Requests send search terms and entity IDs, never the photo, notes or raw cover text. The service also receives ordinary network information such as the device's IP address.
+
+Wikidata lookup searches English labels/aliases, retrieves up to eight candidate entities, resolves their type ancestry (two subclass hops) and related labels, then filters/ranks matches by title, explicit Arabic sequel numbers and any known platform hint. Type ancestry is bounded; deeply specialized types or incomplete records may be missed. Roman/Arabic numeral equivalence is not inferred. This is catalog retrieval, not general web browsing or a guarantee that the match is correct.
+
+Canonical English labels supply title spelling/capitalization. Available publisher, series, earliest catalog publication year and developer/director fill suggestions. A single supported platform or matching recognized platform can be proposed; multiplatform works without a hint leave the platform field blank. Other supported platforms and genre appear in the match detail. Earliest publication year is work-level and may differ from the user's port, region or edition. Language, condition, physical format, region and EAN are not inferred from a work record. Unknown fields stay blank. Catalog facts do not need to appear in the OCR; only the local extraction step requires visual/text support.
+
+Lookup is explicitly initiated, rate-limited to at most one request per 1.1 seconds and bounded to 1 MiB per JSON response, with a 24-hour result cache (up to 100 entries). Cached searches include type, title and platform. Network failure preserves the form. Applying a match fills blanks; an otherwise identical title adopts catalog capitalization. Other existing values are preserved unless Replace existing details is selected. Items are still saved only by the form's Save action. Wikidata source ID and URL are stored with applied metadata. This integration does not fetch game/movie artwork.
 
 ## Verification and limits
 
@@ -28,3 +34,8 @@ Core regressions cover malformed Nintendo Switch branding, split game titles, cr
 Primary API references:
 - https://developers.google.com/ml-kit/genai/prompt/android/get-started
 - https://developers.google.com/ml-kit/genai/prompt/android/prompt-design
+
+- https://www.mediawiki.org/wiki/Wikibase/API
+- https://www.wikidata.org/wiki/Help:Data_access
+
+The trimmed Wikidata Mario fixture was retrieved from the public Action API on 2026-10-19 (CC0 data); it retains labels and relevant non-deprecated statement structures. Live service calls are not part of deterministic CI tests.

@@ -118,7 +118,7 @@ jobs:
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb install -r built-apks/debug/app-debug.apk
             adb install -r built-apks/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -e timeout_msec 120000 no.vardir.hodd.test/no.vardir.hodd.HoddTestRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (31 tests)' device-tests.txt
+            adb shell am instrument -w -e timeout_msec 120000 no.vardir.hodd.test/no.vardir.hodd.HoddTestRunner | tee device-tests.txt; adb pull /sdcard/Android/data/no.vardir.hodd/files/screenshots screenshots || true; grep -q '^OK (33 tests)' device-tests.txt
             bash scripts/check-apk-update.sh built-apks/debug/app-debug.apk built-apks/release/app-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
