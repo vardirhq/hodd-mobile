@@ -64,9 +64,7 @@ internal fun PhotoEditor(source: File, onAccepted: (String) -> Unit, onCancel: (
             error = "This photo could not be opened. Choose another photo or try taking it again."
         }
     }
-    DisposableEffect(bitmap) { onDispose { bitmap?.recycle() } }
     val preview = remember(bitmap, turns) { bitmap?.let { PhotoEdits.rotate(it, turns) } }
-    DisposableEffect(preview) { onDispose { if (preview !== bitmap) preview?.recycle() } }
     val crop = PhotoCrop(left, top, right, bottom)
     fun setCrop(next: PhotoCrop) { left = next.left; top = next.top; right = next.right; bottom = next.bottom }
     fun resetCrop() = setCrop(PhotoCrop())
