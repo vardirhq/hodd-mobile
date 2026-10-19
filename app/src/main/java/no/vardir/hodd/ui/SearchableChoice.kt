@@ -57,7 +57,7 @@ internal fun SearchableChoice(
                 OutlinedTextField(query, { query = it.take(100) }, label = { Text("Search choices") },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) }, singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("choice-search"))
-                LazyColumn(Modifier.weight(1f).testTag("choice-results")) {
+                LazyColumn(Modifier.weight(1f, fill = false).testTag("choice-results")) {
                     if (optional && query.isBlank()) item {
                         TextButton(onClick = { choose(""); open = false }, modifier = Modifier.fillMaxWidth()) { Text("Leave blank") }
                     }
