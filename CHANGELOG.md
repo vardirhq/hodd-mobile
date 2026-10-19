@@ -4,6 +4,16 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10] - 2026-10-20
+
+### Added
+- A visible store browser with JavaScript and first-party cookies for pages that direct fetching cannot read.
+- Import this product reads bounded metadata from the displayed page into the existing product/field review; no server is required.
+
+### Fixed
+- Browser challenge pages without product metadata do not become item suggestions.
+- Browser cancellation and navigation invalidate pending extraction; file/content access, mixed content and native JavaScript bridges are disabled.
+
 ## [0.1.0-alpha.9] - 2026-10-20
 
 ### Added

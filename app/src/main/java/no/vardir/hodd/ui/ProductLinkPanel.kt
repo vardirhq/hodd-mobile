@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.ItemSuggestion
+import no.vardir.hodd.data.ProductBrowserMetadata
 import no.vardir.hodd.data.ProductLinkSource
 import no.vardir.hodd.data.ProductPreview
 import java.io.File
@@ -37,6 +38,7 @@ internal fun ProductLinkPanel(
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     var failure by remember { mutableStateOf<String?>(null) }
+    var browsing by remember { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var url by rememberSaveable { mutableStateOf("") }
     var candidates by remember { mutableStateOf(emptyList<ProductPreview>()) }
@@ -86,11 +88,11 @@ internal fun ProductLinkPanel(
 
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { expanded = !expanded }, enabled = enabled && !running, contentPadding = PaddingValues(0.dp)) { Text("Import from a store") }
+            TextButton(onClick = { expanded = !expanded }, enabled = enabled && !running && !browsing, contentPadding = PaddingValues(0.dp)) { Text("Import from a store") }
             if (expanded) {
                 Text("Read a public product page on this device. The store receives your request; photos and collection data are not uploaded.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 OutlinedTextField(url, { url = it.take(2000); failure = null }, label = { Text("Product page URL") }, singleLine = true,
-                    enabled = enabled && !running, modifier = Modifier.fillMaxWidth())
+                    enabled = enabled && !running && !browsing, modifier = Modifier.fillMaxWidth())
                 Button(onClick = {
                     request("Reading product details…") {
                         val found = source.preview(url.trim())
@@ -99,11 +101,14 @@ internal fun ProductLinkPanel(
                         candidates = found
                         selected = found.singleOrNull()
                     }
-                }, enabled = enabled && !running && url.trim().startsWith("https://", true)) { Text("Fetch product details") }
+                }, enabled = enabled && !running && !browsing && url.trim().startsWith("https://", true)) { Text("Fetch product details") }
+                OutlinedButton(onClick = { failure = null; browsing = true; currentWorking(true) },
+                    enabled = enabled && !running && !browsing && ProductBrowserMetadata.isPublicHttps(url.trim())) { Text("Open store in Hodd") }
+                Text("If fetching fails, open the store here and tap Import this product after it loads.", style = MaterialTheme.typography.bodySmall, color = Muted)
             }
             failure?.let { error ->
                 Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                Text("You can open the store in your browser, then return to enter details or add a photo. Hodd cannot bypass store restrictions.", style = MaterialTheme.typography.bodySmall)
+                Text("Try Open store in Hodd to load the page and import its details. Stores may still refuse access. You can also open your external browser or keep editing manually.", style = MaterialTheme.typography.bodySmall)
                 val browserUrl = runCatching { java.net.URI(url.trim()).takeIf { it.scheme.equals("https", true) && !it.host.isNullOrBlank() && it.userInfo == null } }.getOrNull()
                 if (browserUrl != null) TextButton(onClick = {
                     runCatching { uriHandler.openUri(browserUrl.toString()) }.onFailure { message("No browser could open this link.") }
@@ -115,6 +120,9 @@ internal fun ProductLinkPanel(
             }
         }
     }
+    if (browsing) ProductBrowser(url.trim(), close = { browsing = false; currentWorking(false) }, imported = { found ->
+        browsing = false; currentWorking(false); candidates = found; selected = found.singleOrNull()
+    })
     if (candidates.isNotEmpty() && selected == null) AlertDialog(onDismissRequest = ::dismiss,
         title = { Text("Choose the product") }, text = {
             Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {

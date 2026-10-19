@@ -43,7 +43,7 @@ object ProductLinkImporter : ProductLinkSource {
     private val rateLimits = ProductLinkRateLimits()
     private const val MAX_HTML = 2_000_000
     private const val MAX_IMAGE = 8_000_000
-    private fun validatedUrl(raw: String): URL {
+    internal fun validatedUrl(raw: String): URL {
         val url = URL(raw.trim())
         require(url.protocol == "https") { "Use an HTTPS product link." }
         require(url.userInfo == null && url.port in listOf(-1, 443)) { "Unsupported product URL." }
@@ -135,7 +135,26 @@ object ProductLinkImporter : ProductLinkSource {
         require(html.length <= MAX_HTML) { "The webpage is too large." }
         return parseDocument(Jsoup.parse(html, pageUrl), pageUrl)
     }
-    private fun parseDocument(document: Document, pageUrl: String): List<ProductPreview> {
+    /** Read only the bounded metadata snapshot returned by the visible browser, never executable HTML. */
+    fun parseBrowserSnapshot(snapshot: String, pageUrl: String): List<ProductPreview> {
+        require(snapshot.length <= MAX_HTML) { "The page metadata is too large." }
+        require(ProductBrowserMetadata.isPublicHttps(pageUrl)) { "Use a public HTTPS product page." }
+        val data = JSONObject(snapshot)
+        val document = Document.createShell(pageUrl)
+        document.title(data.optString("title").take(300))
+        val scripts = data.optJSONArray("jsonLd") ?: JSONArray()
+        require(scripts.length() <= 64) { "Too many metadata blocks." }
+        for (i in 0 until scripts.length()) {
+            document.head().appendElement("script").attr("type", "application/ld+json")
+                .appendChild(org.jsoup.nodes.DataNode(scripts.getString(i)))
+        }
+        val meta = data.optJSONObject("meta") ?: JSONObject()
+        listOf("og:title", "og:description", "og:image", "og:image:secure_url", "og:type").forEach { key ->
+            document.head().appendElement("meta").attr("property", key).attr("content", meta.optString(key).take(4000))
+        }
+        return parseDocument(document, pageUrl, requireProduct = true)
+    }
+    private fun parseDocument(document: Document, pageUrl: String, requireProduct: Boolean = false): List<ProductPreview> {
         val nodes = mutableListOf<JSONObject>()
         val parents = mutableMapOf<JSONObject, JSONObject>()
         val parentIds = mutableMapOf<String, JSONObject>()
@@ -180,6 +199,10 @@ object ProductLinkImporter : ProductLinkSource {
             val id = absolute(product.optString("@id"), pageUrl).ifBlank { product.toString() }
             val productUrl = product.optString("url").ifBlank { product.optString("@id") }
             return (if (id in mainIds) 100 else 0) + (if (productUrl.isNotBlank() && identity(productUrl, pageUrl) == identity(pageUrl, pageUrl)) 50 else 0)
+        }
+        if (requireProduct) require(products.isNotEmpty() || (meta("og:title").isNotBlank() &&
+            (meta("og:image").isNotBlank() || meta("og:type").contains("product", true)))) {
+            "No product metadata is available yet. Wait for the product page to load, then try Import again."
         }
         val bestScore = products.maxOfOrNull(::score) ?: 0
         val selected = if (bestScore > 0) products.filter { score(it) == bestScore } else products
