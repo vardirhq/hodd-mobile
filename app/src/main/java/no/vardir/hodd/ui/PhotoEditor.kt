@@ -64,6 +64,7 @@ internal fun PhotoEditor(source: File, onAccepted: (String) -> Unit, onCancel: (
         } catch (failure: Exception) {
             loaded?.recycle()
             if (failure is CancellationException) throw failure
+            value = null
             error = "This photo could not be opened. Choose another photo or try taking it again."
         }
     }
