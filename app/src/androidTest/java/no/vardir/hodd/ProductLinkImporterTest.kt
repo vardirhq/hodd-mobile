@@ -90,4 +90,15 @@ class ProductLinkImporterTest {
         assertFalse(result.suggestion("Other").attributes.containsKey("storePrice"))
     }
 
+    @Test fun linkedVariantsInheritGroupMetadataAndExtremePricesAreRejected() {
+        val html = """<script type="application/ld+json">{"@graph":[
+          {"@type":"ProductGroup","brand":"Brand","hasVariant":[{"@id":"#small"},{"@id":"#large"}]},
+          {"@type":"Product","@id":"#small","name":"Small","offers":{"price":"1e1000000000","priceCurrency":"NOK"}},
+          {"@type":"Product","@id":"#large","name":"Large"}
+        ]}</script>"""
+        val products = ProductLinkImporter.parseCandidates(html, "https://shop.example/item")
+        assertEquals(2, products.size)
+        assertTrue(products.all { it.brand == "Brand" && it.price.isBlank() })
+    }
+
 }

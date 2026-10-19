@@ -113,7 +113,7 @@ object ProductLinkImporter : ProductLinkSource {
         else -> ""
     }
     private fun absolute(raw: String, base: String): String = runCatching {
-        if (raw.isBlank()) "" else URL(URL(base), raw).takeIf { it.protocol == "https" && it.userInfo == null && it.port in listOf(-1, 443) }?.toString().orEmpty()
+        if (raw.isBlank() || raw.length > 4000) "" else URL(URL(base), raw).takeIf { it.protocol == "https" && it.userInfo == null && it.port in listOf(-1, 443) }?.toString().orEmpty()
     }.getOrDefault("")
     private fun identity(raw: String, base: String): String = runCatching {
         val url = URL(absolute(raw, base))
@@ -130,12 +130,16 @@ object ProductLinkImporter : ProductLinkSource {
     private fun parseDocument(document: Document, pageUrl: String): List<ProductPreview> {
         val nodes = mutableListOf<JSONObject>()
         val parents = mutableMapOf<JSONObject, JSONObject>()
+        val parentIds = mutableMapOf<String, JSONObject>()
         fun collect(value: Any?, depth: Int = 0, group: JSONObject? = null) {
             if (depth > 24 || nodes.size >= 256) return
             when (value) {
                 is JSONObject -> {
                     nodes += value
-                    if (group != null && typeIs(value, "Product")) parents[value] = group
+                    if (group != null) {
+                        if (typeIs(value, "Product")) parents[value] = group
+                        if (value.optString("@id").isNotBlank()) parentIds[absolute(value.optString("@id"), pageUrl)] = group
+                    }
                     val nextGroup = if (typeIs(value, "ProductGroup")) value else group
                     listOf("@graph", "mainEntity", "itemListElement", "item", "hasVariant", "image", "offers", "brand", "publisher").forEach { collect(value.opt(it), depth + 1, nextGroup) }
                 }
@@ -172,13 +176,14 @@ object ProductLinkImporter : ProductLinkSource {
         val bestScore = products.maxOfOrNull(::score) ?: 0
         val selected = if (bestScore > 0) products.filter { score(it) == bestScore } else products
         fun preview(product: JSONObject?): ProductPreview {
-            val group = parents[product]
+            val group = parents[product] ?: product?.optString("@id")?.let { parentIds[absolute(it, pageUrl)] }
             fun property(key: String): Any? = product?.opt(key)?.takeUnless { it == JSONObject.NULL } ?: group?.opt(key)
             val offers = resolve(property("offers"))
             val offerList = if (offers is JSONArray) (0 until offers.length()).mapNotNull { resolve(offers.opt(it)) as? JSONObject } else listOfNotNull(offers as? JSONObject)
             val prices = offerList.mapNotNull { offer ->
                 val raw = text(offer.opt("price")).ifBlank { if (typeIs(offer, "AggregateOffer")) text(offer.opt("lowPrice")) else "" }
-                val amount = raw.toBigDecimalOrNull()?.takeIf { it.signum() >= 0 && raw.length <= 40 } ?: return@mapNotNull null
+                if (raw.length > 40) return@mapNotNull null
+                val amount = raw.toBigDecimalOrNull()?.takeIf { it.signum() >= 0 && it.precision() <= 24 && it.scale() in -8..8 } ?: return@mapNotNull null
                 Triple(amount.toPlainString(), text(offer.opt("priceCurrency")).uppercase(Locale.ROOT).takeIf { it.matches(Regex("[A-Z]{3}")) }.orEmpty(), typeIs(offer, "AggregateOffer"))
             }.distinct()
             val price = prices.singleOrNull()
