@@ -89,4 +89,18 @@ class ItemSuggestionsTest {
         val updated = catalog.copy(items = listOf(catalog.items.single().copy(metadataSource = "Open Library", metadataId = "/works/OL1W")))
         assertEquals(updated, CatalogCodec.decode(CatalogCodec.encode(updated)))
     }
+    @Test fun productLinksPreserveExistingProvenanceAndKeepStoreEvidenceSeparate() {
+        val original = CatalogItem(collectionId = "shelf", title = "My title", publisher = "My publisher", notes = "My notes",
+            metadataSource = "Wikidata", metadataUrl = "https://www.wikidata.org/wiki/Q1")
+        val suggestion = ItemSuggestion("Shop title", publisher = "Shop publisher", notes = "Marketing", source = "Product link", sourceUrl = "https://shop.example/item",
+            attributes = mapOf("brand" to "Brand", "storeUrl" to "https://shop.example/item", "storePrice" to "499 NOK"))
+        val merged = original.withSuggestion(suggestion)
+        assertEquals("My title", merged.title); assertEquals("My publisher", merged.publisher); assertEquals("My notes", merged.notes)
+        assertEquals("Wikidata", merged.metadataSource); assertEquals(original.metadataUrl, merged.metadataUrl)
+        assertEquals("", original.copy(metadataUrl = "").withSuggestion(suggestion).metadataUrl)
+        assertEquals("https://shop.example/item", merged.attributes["storeUrl"])
+        val fresh = CatalogItem(collectionId = "shelf", title = "").withSuggestion(suggestion)
+        assertEquals("Product link", fresh.metadataSource); assertEquals(suggestion.sourceUrl, fresh.metadataUrl)
+    }
+
 }

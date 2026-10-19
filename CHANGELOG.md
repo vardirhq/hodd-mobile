@@ -4,6 +4,19 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9] - 2026-10-20
+
+### Added
+- On-device store-link import with reviewed field selection, separate brand/publisher data and dated retail-price/source evidence.
+- Main-product/URL selection and an explicit product/variant picker for ambiguous structured metadata; Open Graph fallback.
+- Optional bounded image preview followed by the existing photo editor; existing covers are retained when adding a store image.
+
+### Fixed
+- Store requests block competing save/photo actions and support cancellation without late application or leftover staged images.
+- ImageObject URLs and linked JSON-LD references are resolved; descriptions are converted to plain text and aggregate prices are labeled.
+- Existing user edits and catalog provenance survive product imports.
+- Android CI validates a successful nonempty test summary without a hardcoded suite size, while rejecting failure/crash results.
+
 ## [0.1.0-alpha.8] - 2026-10-19
 
 ### Added
