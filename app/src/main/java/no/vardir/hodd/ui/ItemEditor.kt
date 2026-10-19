@@ -72,9 +72,18 @@ internal fun ItemEditor(
     var notes by rememberSaveable(draftId) { mutableStateOf(existing?.notes.orEmpty()) }
     var lentTo by rememberSaveable(draftId) { mutableStateOf(existing?.lentTo.orEmpty()) }
     var photoName by rememberSaveable(draftId) { mutableStateOf(existing?.photoName) }
+    var photoNames by rememberSaveable(draftId) { mutableStateOf(existing?.photoNames.orEmpty()) }
+    var addingAdditional by rememberSaveable(draftId) { mutableStateOf(false) }
+    var editingAdditional by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var pendingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var editingPhoto by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var editingTemporary by rememberSaveable(draftId) { mutableStateOf(false) }
+    val createdPhotos = remember(draftId) { mutableSetOf<String>() }
+    fun discardUnsavedPhotos() {
+        val keep = (listOfNotNull(existing?.photoName) + existing?.photoNames.orEmpty()).toSet()
+        createdPhotos.filterNot { it in keep }.forEach { photo(it)?.delete() }
+        createdPhotos.clear()
+    }
     var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var assisting by remember { mutableStateOf(false) }
@@ -92,15 +101,15 @@ internal fun ItemEditor(
     var pendingBrand by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val status = ItemStatus.valueOf(statusName)
-    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes)
-    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
-    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else cancel() } }
+    val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames)
+    val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
+    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { barcode = it; message("Identifier inserted.") }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) { editingPhoto = it; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() }; importing = false } }
+        if (uri != null) { importing = true; importPhoto(uri) { if (it != null) { createdPhotos.add(it); editingPhoto = it; editingTemporary = true; focusManager.clearFocus(); keyboard?.hide() }; importing = false } }
     }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val name = pendingPhoto
@@ -113,6 +122,7 @@ internal fun ItemEditor(
             val target = photo(name)!!
             target.parentFile!!.mkdirs()
             pendingPhoto = name
+            createdPhotos.add(name)
             camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", target))
         } catch (_: Exception) {
             pendingPhoto = null
@@ -178,12 +188,15 @@ internal fun ItemEditor(
         val source = photo(sourceName)
         if (source != null) {
             PhotoEditor(source, onAccepted = { editedName ->
-                photoName = editedName
-                if (editingTemporary) source.delete()
-                editingPhoto = null; editingTemporary = false; offerIdentification = true
+                if (editingAdditional != null) photoNames = photoNames.map { if (it == editingAdditional) editedName else it }
+                else if (addingAdditional && photoName != null) photoNames = photoNames + editedName
+                else photoName = editedName
+                if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
+                createdPhotos.add(editedName)
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; offerIdentification = true
             }, onCancel = {
-                if (editingTemporary) source.delete()
-                editingPhoto = null; editingTemporary = false
+                if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
             }, message = message)
             return
         }
@@ -215,7 +228,43 @@ internal fun ItemEditor(
                     if (photoName != null) TextButton(onClick = {
                         focusManager.clearFocus(); keyboard?.hide(); editingPhoto = photoName; editingTemporary = false
                     }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Crop, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Edit photo") }
-                    if (photoName != null) TextButton(onClick = { photoName = null }, enabled = !busy && !importing && !assisting) { Text("Remove photo") }
+                    if (photoName != null) TextButton(onClick = { photoName = photoNames.firstOrNull(); photoNames = photoNames.drop(1) }, enabled = !busy && !importing && !assisting) { Text("Remove photo") }
+                }
+            }
+            if (photoName != null || photoNames.isNotEmpty()) {
+                Text("Photo gallery", style = MaterialTheme.typography.titleMedium)
+                photoNames.forEach { extra ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Cover(draft.copy(photoName = extra), photo(extra), Modifier.width(55.dp).height(72.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Additional photo", style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = {
+                                val oldCover = photoName
+                                photoName = extra
+                                photoNames = photoNames.filterNot { it == extra } + listOfNotNull(oldCover)
+                            }) { Text("Set as cover") }
+                        }
+                        IconButton(onClick = { editingAdditional = extra; editingPhoto = extra; editingTemporary = false }, enabled = !busy) {
+                            Icon(Icons.Outlined.Crop, "Edit additional photo")
+                        }
+                        IconButton(onClick = { photoNames = photoNames.filterNot { it == extra } }, enabled = !busy) {
+                            Icon(Icons.Outlined.Delete, "Remove additional photo")
+                        }
+                    }
+                }
+                if (photoNames.size < 20) {
+                    Row {
+                        TextButton(onClick = { addingAdditional = true; gallery.launch("image/*") }, enabled = !busy && !importing && !assisting) {
+                            Icon(Icons.Outlined.Add, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Add photo")
+                        }
+                        TextButton(onClick = {
+                            addingAdditional = true
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
+                            else cameraPermission.launch(Manifest.permission.CAMERA)
+                        }, enabled = !busy && !importing && !assisting) { Text("Take another") }
+                    }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -355,7 +404,7 @@ internal fun ItemEditor(
             }) { Text("Change brand") } },
             dismissButton = { TextButton(onClick = { pendingBrand = null }) { Text("Keep platform") } })
     }
-    if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = cancel) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
+    if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard your changes?") }, text = { Text("This item has unsaved changes.") }, confirmButton = { TextButton(onClick = { discardUnsavedPhotos(); cancel() }) { Text("Discard") } }, dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
 }
 
 private val AttributeSaver = mapSaver<Map<String, String>>(

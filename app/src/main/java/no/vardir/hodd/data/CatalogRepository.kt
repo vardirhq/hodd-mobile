@@ -83,7 +83,7 @@ class CatalogRepository(private val context: Context, private val root: File = c
     internal suspend fun restoreRecovery(id: String) = withContext(Dispatchers.IO) {
         lock.withLock {
             val candidate = history.read(id)
-            require(candidate.items.mapNotNull { it.photoName }.all { photo(it)?.isFile == true }) {
+            require(candidate.items.flatMap { listOfNotNull(it.photoName) + it.photoNames }.all { photo(it)?.isFile == true }) {
                 "A recovery photo is missing. Import a complete exported backup instead. Nothing was replaced."
             }
             commit(candidate, preserveUnreadable = true)
@@ -106,7 +106,7 @@ class CatalogRepository(private val context: Context, private val root: File = c
         lock.withLock {
             try {
                 // New immutable photo names mean a failed restore cannot overwrite existing covers.
-                val names = staged.catalog.items.mapNotNull { it.photoName }.distinct().associateWith { old ->
+                val names = staged.catalog.items.flatMap { listOfNotNull(it.photoName) + it.photoNames }.distinct().associateWith { old ->
                     val name = "${UUID.randomUUID()}.${old.substringAfterLast('.')}"
                     val target = photo(name)!!
                     check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "Could not restore photos." }
@@ -116,7 +116,7 @@ class CatalogRepository(private val context: Context, private val root: File = c
                     require(BackupArchive.digest(target.inputStream()) == staged.manifest.entries["photos/$old"]) { "A staged photo is damaged. Nothing was replaced." }
                     name
                 }
-                val next = staged.catalog.copy(items = staged.catalog.items.map { item -> item.copy(photoName = item.photoName?.let { names.getValue(it) }) })
+                val next = staged.catalog.copy(items = staged.catalog.items.map { item -> item.copy(photoName = item.photoName?.let { names.getValue(it) }, photoNames = item.photoNames.map { names.getValue(it) }) })
                 commit(next, preserveUnreadable = true)
             } catch (error: Exception) {
                 // A candidate recovery revision may already reference these files even if

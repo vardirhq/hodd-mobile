@@ -4,6 +4,15 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8] - 2026-10-19
+
+### Added
+- Multiple photos per item with cover selection, photo editing, and individual removal.
+- Backup and recovery support for additional photos while preserving older catalogs.
+
+### Fixed
+- Clean up staged photo files when discarding item edits.
+
 ## [0.1.0-alpha.7] - 2026-10-19
 
 ### Fixed

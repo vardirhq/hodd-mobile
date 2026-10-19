@@ -35,6 +35,8 @@ data class CatalogItem(
     val releaseYear: String = "",
     val condition: String = "",
     val attributes: Map<String, String> = emptyMap(),
+    // Additional photos; photoName remains the primary cover for legacy catalogs.
+    val photoNames: List<String> = emptyList(),
 )
 
 @Serializable
@@ -84,6 +86,8 @@ object CatalogCodec {
         require(catalog.items.map { it.id }.distinct().size == catalog.items.size) { "Duplicate item IDs." }
         catalog.items.forEach {
             require(it.photoName == null || Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(it.photoName)) { "Invalid photo filename." }
+            require(it.photoNames.size <= 20 && it.photoNames.distinct().size == it.photoNames.size) { "Invalid additional photo list." }
+            require(it.photoNames.all { name -> Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp)").matches(name) && name != it.photoName }) { "Invalid additional photo filename." }
             require(catalog.collections.any { collection -> collection.id == it.collectionId }) { "Item without collection." }
         }
         return catalog
