@@ -165,6 +165,17 @@ class CatalogRepository(private val context: Context, private val root: File = c
                     output.fd.sync()
                 }
             }
+            val decoded = PhotoEdits.decode(destination, 2560)
+            try {
+                val normalized = File.createTempFile("normalized-", ".jpg", destination.parentFile)
+                try {
+                    FileOutputStream(normalized).use { stream ->
+                        check(decoded.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, stream))
+                        stream.fd.sync()
+                    }
+                    check(normalized.renameTo(destination) || run { normalized.copyTo(destination, overwrite = true); true })
+                } finally { normalized.delete() }
+            } finally { decoded.recycle() }
             name
         } catch (error: Exception) { destination.delete(); throw error }
     }
