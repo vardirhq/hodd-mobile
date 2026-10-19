@@ -54,20 +54,17 @@ internal fun PhotoEditor(source: File, onAccepted: (String) -> Unit, onCancel: (
     var precise by rememberSaveable(source.path) { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember(source.path) { mutableStateOf<String?>(null) }
-    val bitmap by produceState<Bitmap?>(null, source.path) {
-        var loaded: Bitmap? = null
+    var bitmap by remember(source.path) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(source.path) {
         try {
-            val decoded = withContext(Dispatchers.IO) { PhotoEdits.decode(source, 1280) }
-            loaded = decoded
-            value = decoded
-            awaitDispose { decoded.recycle() }
+            bitmap = withContext(Dispatchers.IO) { PhotoEdits.decode(source, 1280) }
         } catch (failure: Exception) {
-            loaded?.recycle()
             if (failure is CancellationException) throw failure
-            value = null
+            bitmap = null
             error = "This photo could not be opened. Choose another photo or try taking it again."
         }
     }
+    DisposableEffect(bitmap) { onDispose { bitmap?.recycle() } }
     val preview = remember(bitmap, turns) { bitmap?.let { PhotoEdits.rotate(it, turns) } }
     DisposableEffect(preview) { onDispose { if (preview !== bitmap) preview?.recycle() } }
     val crop = PhotoCrop(left, top, right, bottom)
