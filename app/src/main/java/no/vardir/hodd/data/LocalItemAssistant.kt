@@ -208,7 +208,7 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
             val image = withContext(Dispatchers.IO) { InputImage.fromFilePath(context, Uri.fromFile(file)) }
             recognizer.process(image).await()
         } finally { recognizer.close() }
-        val evidence = CoverEvidence(result.textBlocks.flatMap { it.lines }.mapIndexed { index, line ->
+        val evidence = CoverEvidence(result.textBlocks.flatMap { it.lines }.filter { it.text.isNotBlank() }.take(64).mapIndexed { index, line ->
             CoverLine(line.text.trim(), line.boundingBox?.height() ?: 0, index)
         }, kind)
         if (status() == LocalAiStatus.AVAILABLE) {
@@ -228,7 +228,7 @@ class LocalItemAssistant(private val context: Context, private val model: LocalT
     /** Lets a user fix OCR before any model request or online lookup. */
     suspend fun readCoverText(text: String, kind: String): LocalSuggestions {
         require(text.isNotBlank() && text.length <= 3000) { "Enter up to 3,000 characters of cover text." }
-        return structure(CoverEvidence(text.lines().mapIndexed { index, line -> CoverLine(line.trim(), order = index) }, kind))
+        return structure(CoverEvidence(text.lines().filter { it.isNotBlank() }.take(64).mapIndexed { index, line -> CoverLine(line.trim(), order = index) }, kind))
     }
 
     private fun reviewed(evidence: CoverEvidence, suggestion: ItemSuggestion, notice: String): LocalSuggestions {

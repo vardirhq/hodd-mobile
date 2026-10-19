@@ -54,12 +54,12 @@ class CoverEvidence(val lines: List<CoverLine>, val requestedKind: String) {
     fun validate(proposal: ItemSuggestion, imageBased: Boolean = false): ItemSuggestion {
         require(proposal.title.isNotBlank() && !branding(proposal.title) && !noise(proposal.title)) { "The model mistook branding for the item title. Review the recognized text or try a closer photo." }
         require(imageBased || supported(proposal.title)) { "The model's title was not supported by the cover text. Review the text or try another photo." }
+        val resolvedKind = if (imageBased && proposal.kind in FieldChoices.kinds.map { it.value }) proposal.kind else kind
         val safeCreator = proposal.creator.takeIf { value ->
             val knownCompany = (FieldChoices.publishers + FieldChoices.developers).any { normalized(it.value) == normalized(value) }
             val gameCredit = knownCompany || Regex("(?i)(developed|published|created)\\s+by").containsMatchIn(content)
-            (kind != "Game" || gameCredit) && supported(value) && normalized(value) != normalized(proposal.title) &&
+            (resolvedKind != "Game" || gameCredit) && supported(value) && normalized(value) != normalized(proposal.title) &&
             !(normalized(value).length > 5 && normalized(proposal.title).contains(normalized(value))) }.orEmpty()
-        val resolvedKind = if (imageBased && proposal.kind in FieldChoices.kinds.map { it.value }) proposal.kind else kind
         val platform = detectedPlatform.takeIf { resolvedKind == "Game" }
         val safeAttributes = proposal.attributes.filter { (key, value) ->
             key in setOf("isbn", "pages", "binding", "developer", "region", "edition", "director", "runtime", "resolution", "label", "catalogNumber", "tracks", "country", "denomination", "mintYear", "mintMark", "material") && supported(value)

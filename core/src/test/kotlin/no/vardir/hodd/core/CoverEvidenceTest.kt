@@ -18,6 +18,8 @@ class CoverEvidenceTest {
         val evidence = CoverEvidence(listOf(CoverLine("NINTENDO SWITCH"), CoverLine("SUPER MARIO"), CoverLine("ODYSSEY")), "Game")
         val result = evidence.validate(ItemSuggestion("Super Mario", "ODYSSEY"))
         assertEquals("", result.creator)
+        val noHeader = CoverEvidence(listOf(CoverLine("SUPER MARIO"), CoverLine("ODYSSEY")), "Book")
+        assertEquals("", noHeader.validate(ItemSuggestion("Super Mario", "ODYSSEY", "Game"), imageBased = true).creator)
         assertEquals("Nintendo Switch", result.attributes["platform"])
         assertEquals("Nintendo", result.attributes["platformBrand"])
         assertEquals("Super Mario Odyssey", evidence.validate(ItemSuggestion("Super Mario Odyssey")).title)
