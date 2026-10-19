@@ -23,6 +23,8 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       - name: Validate version and changelog
         run: |
           python3 scripts/release_metadata.py
@@ -52,10 +54,10 @@ jobs:
           echo "HODD_KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
           echo "HODD_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "HODD_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-      - run: ./gradlew :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+      - run: ./gradlew --build-cache --parallel :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
       - name: Build and verify signed APK
         run: |
-          ./gradlew :app:assembleRelease
+          ./gradlew --build-cache :app:assembleRelease
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk | tee "$RUNNER_TEMP/hodd-signature.txt"
           if [ "${{ steps.signing.outputs.ready }}" = 'true' ]; then
             expected=$(openssl x509 -in docs/signing-certificate.pem -outform DER | sha256sum | cut -d ' ' -f 1)
@@ -98,11 +100,17 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+      # Device tests install the APKs built above; they never invoke Gradle.
       - uses: actions/download-artifact@v4
         with:
           name: hodd-mobile-test-apks
           path: built-apks
+      - name: Cache Android emulator AVD
+        id: avd-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/avd
+          key: avd-${{ runner.os }}-api35-pixel5-v1
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -113,7 +121,10 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_5
+          avd-name: hodd-ci-api35
+          force-avd-creation: false
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene
           script: |
             adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.threebutton
             adb install -r built-apks/debug/app-debug.apk

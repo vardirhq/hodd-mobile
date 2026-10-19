@@ -54,9 +54,16 @@ val generateChangelogAssets by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("generated/changelog-assets"))
 }
 tasks.named("preBuild").configure { dependsOn(generateChangelogAssets) }
-tasks.configureEach {
-    if (name == "preReleaseBuild") doFirst {
-        check(hoddSigningReady) { "Release APKs require the persistent Hodd signing key. See docs/SIGNING.md." }
+// Validate signing while configuring release tasks. Capturing script state inside
+// a task action breaks Gradle's configuration cache.
+val releaseRequested = gradle.startParameter.taskNames.any { task ->
+    task.contains("Release", ignoreCase = true) ||
+        task.contains("bundle", ignoreCase = true) ||
+        task == "assemble"
+}
+if (releaseRequested) {
+    check(hoddSigningReady) {
+        "Release APKs require the persistent Hodd signing key. See docs/SIGNING.md."
     }
 }
 dependencies {
