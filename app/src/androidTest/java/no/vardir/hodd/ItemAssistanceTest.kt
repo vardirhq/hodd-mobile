@@ -98,13 +98,17 @@ class ItemAssistanceTest {
             assertTrue(url.contains("search=SUPER+MARIO+MAKER+2"))
             """{"search":[{"id":"Q61831178"}]}""".toByteArray()
         } else {
-            """{"entities":{
+            val payload = """{"entities":{
               "Q61831178":{"labels":{"en":{"value":"Super Mario Maker 2"}},"claims":{
                 "P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q7889"}}}}],
                 "P123":[{"mainsnak":{"datavalue":{"value":{"id":"Q8093"}}}}]}},
               "Q7889":{"labels":{"en":{"value":"video game"}}},
               "Q8093":{"labels":{"en":{"value":"Nintendo"}}}
-            }}""".toByteArray()
+            }}"""
+            val ids = java.net.URLDecoder.decode(url.substringAfter("&ids="), "UTF-8").split('|')
+            val data = kotlinx.serialization.json.Json.parseToJsonElement(payload) as kotlinx.serialization.json.JsonObject
+            val entities = data["entities"] as kotlinx.serialization.json.JsonObject
+            kotlinx.serialization.json.JsonObject(mapOf("entities" to kotlinx.serialization.json.JsonObject(entities.filterKeys { it in ids }))).toString().toByteArray()
         }
     }
 
@@ -117,7 +121,8 @@ class ItemAssistanceTest {
         assertEquals("Nintendo", first.single().publisher)
         assertEquals("Wikidata", first.single().source)
         val count = requests.size
-        assertTrue(count >= 2)
+        assertEquals(4, count)
+        assertTrue(requests.last().contains("props=labels&"))
         assertTrue(requests.none { it.contains("not-an-ean") })
         assertEquals(first, repository.lookup("Game", "", "SUPER MARIO MAKER 2", "", "Nintendo Switch"))
         assertEquals(count, requests.size)

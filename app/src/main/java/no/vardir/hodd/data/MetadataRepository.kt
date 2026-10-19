@@ -84,9 +84,10 @@ class MetadataRepository(private val context: Context, private val transport: ((
             }
             val candidates = WikidataMetadata.searchIds(request("action=wbsearchentities&language=en&type=item&limit=8&search=${URLEncoder.encode(query, "UTF-8")}"))
             val all = mutableMapOf<String, JsonObject>()
-            suspend fun load(ids: List<String>) {
+            suspend fun load(ids: List<String>, labelsOnly: Boolean = false) {
                 ids.distinct().filter { it !in all }.chunked(50).forEach { chunk ->
-                    all.putAll(WikidataMetadata.entities(request("action=wbgetentities&languages=en%7Cmul&languagefallback=1&props=labels%7Caliases%7Cclaims&ids=${chunk.joinToString("%7C")}")))
+                    val props = if (labelsOnly) "labels" else "labels%7Caliases%7Cclaims"
+                    all.putAll(WikidataMetadata.entities(request("action=wbgetentities&languages=en%7Cmul&languagefallback=1&props=$props&ids=${chunk.joinToString("%7C")}")))
                 }
             }
             if (candidates.isEmpty()) return@withLock emptyList()
@@ -96,7 +97,7 @@ class MetadataRepository(private val context: Context, private val transport: ((
                 load(types)
                 types = types.flatMap { all[it]?.let { entity -> WikidataMetadata.ids(entity, "P279") }.orEmpty() }.distinct().take(40)
             }
-            load(candidates.flatMap { all[it]?.let(WikidataMetadata::relatedIds).orEmpty() })
+            load(candidates.flatMap { all[it]?.let(WikidataMetadata::relatedIds).orEmpty() }, labelsOnly = true)
             val results = WikidataMetadata.suggestions(candidates, all, kind, query, platform)
             try {
                 cache.writeText(SuggestionCodec.encode(results))
