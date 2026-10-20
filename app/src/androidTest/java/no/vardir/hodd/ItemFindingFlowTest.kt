@@ -114,10 +114,13 @@ class ItemFindingFlowTest {
     }
 
     @Test fun noMatchKeepsEditableQueryAndManualSave() {
-        editor(CatalogItem(collectionId = "s", title = "My obscure game", kind = "Game"), metadata(emptyList()))
+        editor(CatalogItem(collectionId = "s", title = "", kind = "Game"), metadata(emptyList()))
+        compose.onNodeWithTag("find-item-query").performTextReplacement("My obscure game")
         compose.onNodeWithText("Find matches").performScrollTo().performClick()
         waitFor("No matches found. Edit the search title, check the type or platform, or keep entering details manually.")
         compose.onNodeWithTag("find-item-query").assertTextContains("My obscure game")
+        compose.onNodeWithText("Save changes").assertIsNotEnabled()
+        compose.onNodeWithText("Enter details manually").performScrollTo().performClick()
         compose.onNodeWithText("Save changes").assertIsEnabled().performClick()
         assertEquals("My obscure game", saved!!.title)
     }

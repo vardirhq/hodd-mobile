@@ -38,6 +38,7 @@ internal fun ItemAssistPanel(
     onStoreSearchStarted: () -> Unit = {},
     onCatalogTitle: (String) -> Unit = {},
     onCopyReviewed: (String, String) -> Unit = { _, _ -> },
+    onManualEntry: (String, String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val local = remember(assistant) { assistant ?: LocalItemAssistant(context.applicationContext) }
@@ -67,7 +68,7 @@ internal fun ItemAssistPanel(
     LaunchedEffect(draft.kind) { queryKind = draft.kind; queryPlatform = draft.attributes["platform"].orEmpty(); suggestions = emptyList(); selected = null }
     LaunchedEffect(draft.title) { if (!queryEdited) query = draft.title }
     LaunchedEffect(draft.attributes["platform"]) { queryPlatform = draft.attributes["platform"].orEmpty() }
-    LaunchedEffect(local) { status = local.status() }
+    LaunchedEffect(local, advanced) { if (advanced) status = local.status() }
     DisposableEffect(local) { onDispose { job?.cancel(); local.close(); currentWorking(false) } }
 
     fun task(label: String, action: suspend () -> Unit) {
@@ -106,7 +107,7 @@ internal fun ItemAssistPanel(
             query = candidate?.title.orEmpty(); queryEdited = true
             // Creator OCR is deliberately not a mandatory filter: it often reads a logo or tagline.
             queryCreator = ""
-            queryKind = candidate?.kind?.takeIf { it in FieldChoices.kinds.map { choice -> choice.value } } ?: queryKind
+            queryKind = candidate?.kind?.takeIf { value -> FieldChoices.kinds.any { it.value == value } } ?: queryKind
             queryPlatform = candidate?.attributes?.get("platform").orEmpty().ifBlank { draft.attributes["platform"].orEmpty() }
             reviewSearch = true
             status = local.status()
@@ -155,6 +156,7 @@ internal fun ItemAssistPanel(
                 LinearProgressIndicator(Modifier.fillMaxWidth()); Text(progress, style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { job?.cancel() }) { Text("Cancel request") }
             }
+            TextButton(onClick = { onManualEntry(query.trim(), queryKind) }, enabled = enabled && !running) { Text("Enter details manually") }
             TextButton(onClick = { advanced = !advanced }, enabled = enabled && !running) { Text("Local AI options") }
             if (advanced) {
                 Text(when (status) {

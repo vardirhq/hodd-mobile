@@ -2,7 +2,7 @@
 
 A native Android home for the things you collect. Built with Kotlin and Jetpack Compose, inspired by [Hodd for desktop](https://github.com/vardirhq/hodd).
 
-**Early development · 0.1.0-alpha.4** — the initial offline collection flows are implemented. This is not a production release.
+**Early development · 0.1.0-alpha.11** — the initial offline collection flows are implemented. This is not a production release.
 
 ## What you can do
 
@@ -15,15 +15,14 @@ A native Android home for the things you collect. Built with Kotlin and Jetpack 
 - Find book details by ISBN/title through Open Library, and CD/vinyl releases by barcode/title through MusicBrainz.
 - Review fetched details and optionally download artwork from Open Library or Cover Art Archive.
 - Read cover text offline using bundled ML Kit recognition; prefer Gemini Nano to structure that text when available.
-- Describe an item naturally to propose fields using on-device AI on supported devices.
+- Describe an item naturally to propose a search title using on-device AI on supported devices.
+- Search games/movies using Wikidata, or combine catalog facts with a reviewed store cover.
+- Crop, rotate and adjust photographs; add more images to an item gallery.
+- Organize using tags, storage locations, saved views, sorting and collection insights.
 - Export and restore verified catalog/photo backups; recover recent catalog revisions.
 - Use every collection feature offline, without an account or server.
 
-Open **Find and fill details → Find online** to search by title and optionally creator. Title search takes priority even if an EAN/ISBN is present. With the title left empty, lookup can use a scanned or manually entered identifier. Select Book/Comic for Open Library or CD/Vinyl for MusicBrainz. Games and movies currently support local cover recognition and manual entry, not online metadata lookup.
-
-Suggestions are reviewed before they fill the form. Existing values and photos are preserved unless replacement is explicitly selected. Nothing is saved until you tap Save. Open Library returns work-level matches: check your physical edition and cover. Community catalogs have gaps, and music barcodes can identify multiple releases.
-
-Covers without photos are generated locally from the title and type. Example data is optional and uses fictional titles; your library starts empty.
+Start with **Type → Find item**, enter a title, and choose a catalog match. Games/movies use Wikidata, books/comics Open Library, and music MusicBrainz. Store links can supply a cover, then continue to catalog matching for the rest. Photos and local AI descriptions suggest an editable search title; they do not apply unverified item facts. Review your platform/edition before saving. See [the finding flow](docs/ITEM_FINDING.md).
 
 ## Build
 
@@ -60,13 +59,13 @@ Photos are copied into app-private storage. Camera access is used only for captu
 
 ## Local assistance and online metadata
 
-**Read cover** runs bundled Latin-script ML Kit OCR on the device, including offline. If Gemini Nano is ready, Hodd first tries the cover image plus OCR hints, then category-aware text structuring if image input fails. Text-only outputs are checked against cover text, and platform headers are separated from title candidates. Raw text alternatives remain available, and you can correct OCR plus the proposed title/creator/type before applying or searching online. Image interpretation can still be wrong and depends on supported hardware/AICore. Missing author/edition information is not inferred by the OCR fallback. **Suggest from description** requires an available local model. AI output is untrusted, bounded and validated, and always reviewed; it can still be wrong.
+**Read cover** runs bundled Latin-script ML Kit OCR on-device. When available, Gemini Nano first tries the image plus OCR hints, then text structuring. The proposed title/type opens in **Review search**, ready to correct before any catalog lookup. Raw recognized text is available for reference. Local AI accuracy and image support depend on the physical device/AICore. **Local AI options → Suggest search title** can use a description; model output never directly applies item details.
 
 Hodd checks Gemini Nano availability at runtime. AICore/device/model support varies, and Google Play/AICore initialization may be necessary. Where supported but not downloaded, **Set up local AI** offers an explicit model download. There is no cloud AI fallback, API key or AI subscription. Actual Nano generation still needs testing on supported physical hardware; emulator tests use a controlled model adapter to verify preference and failure handling.
 
-**Find online** sends only a barcode, or title and creator, to Open Library or MusicBrainz over HTTPS. Photos, notes and your catalog are not uploaded. Requests identify Hodd, are serialized at no more than one per 1.1 seconds, and successful results are cached for 24 hours (up to 100 queries). Artwork is downloaded only when you select it and then stored locally. Errors/no matches leave the draft intact and manual entry remains available. Metadata source and provider ID/link are stored with the item.
+**Find matches** sends a barcode or reviewed title/optional creator to Open Library or MusicBrainz, or title/platform to Wikidata over HTTPS. Photos, notes and your catalog are not uploaded. Requests identify Hodd, are serialized at no more than one per 1.1 seconds, and successful results are cached for 24 hours (up to 100 queries). Artwork is downloaded only when you select it and then stored locally. Errors/no matches leave the draft intact and manual entry remains available. Metadata source and provider ID/link are stored with the item.
 
-Sources: [Open Library API](https://openlibrary.org/developers/api), [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive). Cover artwork remains subject to its respective rights. Bundled OCR and the AICore integration are Google ML Kit components and may perform SDK/service diagnostics independently of Hodd; consult [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
+Sources: [Wikidata API](https://www.wikidata.org/wiki/Help:Data_access), [Open Library API](https://openlibrary.org/developers/api), [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive). Cover artwork remains subject to its respective rights. Bundled OCR and the AICore integration are Google ML Kit components and may perform SDK/service diagnostics independently of Hodd; consult [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
 
 ## Data storage
 Open **About Hodd → Backups & recovery** to export a ZIP containing your collections, item details and referenced photos. The selected file is read back and checked before Hodd reports a verified export. Keep an exported copy on another device or in cloud storage, and make a new backup after important changes.
@@ -78,7 +77,7 @@ Internal recovery copies are removed by uninstalling or clearing app data. Andro
 ## Next steps
 
 - Additional metadata sources and duplicate suggestions after scanning.
-- Collection rename/delete and sorting; photo storage management that respects recovery history.
+- Collection rename/delete; photo storage management that respects recovery history.
 - Device testing of camera permission denial, large font sizes, rotation, and long collections.
 - Optional desktop interoperability and GESH sync after the standalone app is solid.
 - Norwegian strings, dark theme, and refinement against the design references.

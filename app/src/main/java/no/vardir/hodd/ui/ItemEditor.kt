@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,6 +63,7 @@ internal fun ItemEditor(
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val editorScroll = rememberScrollState()
+    val manualEntry = remember { BringIntoViewRequester() }
     val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
     DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
     var fieldScan by remember { mutableStateOf<String?>(null) }
@@ -247,6 +250,12 @@ internal fun ItemEditor(
             }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false },
                 metadataRepository = metadataRepository, assistant = assistant,
                 storeSearch = storeSearch, onStoreSearchStarted = { storeSearch = null },
+                onManualEntry = { searchTitle, searchKind ->
+                    if (searchTitle.isNotBlank()) title = searchTitle
+                    kind = searchKind
+                    focusManager.clearFocus(); keyboard?.hide()
+                    scope.launch { manualEntry.bringIntoView() }
+                },
                 onCatalogTitle = { title = it }, onCopyReviewed = { platform, edition ->
                     attributes = attributes.toMutableMap().apply {
                         remove("platform"); remove("platformBrand"); remove("edition")
@@ -324,7 +333,7 @@ internal fun ItemEditor(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth().bringIntoViewRequester(manualEntry), singleLine = true) }
                 scanAction("Title")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {

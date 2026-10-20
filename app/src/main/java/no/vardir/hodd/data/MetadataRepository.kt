@@ -112,24 +112,27 @@ class MetadataRepository(private val context: Context, private val transport: ((
         }
     }
 
-    override suspend fun importCover(suggestion: ItemSuggestion): String = withContext(Dispatchers.IO) {
-        val url = suggestion.coverUrl
-        require(url.startsWith("https://covers.openlibrary.org/") || url.startsWith("https://coverartarchive.org/")) { "Unknown cover provider." }
-        val bytes = readUrl(url, 5 * 1024 * 1024)
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "No usable cover image was found." }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
-        val bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }))
-        val name = "${UUID.randomUUID()}.jpg"
-        val file = File(context.filesDir, "photos/$name")
+    override suspend fun importCover(suggestion: ItemSuggestion): String {
+        val file = File(context.filesDir, "photos/${UUID.randomUUID()}.jpg")
         try {
-            file.parentFile!!.mkdirs()
-            file.outputStream().use { require(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)) }
-            name
+            return withContext(Dispatchers.IO) {
+                val url = suggestion.coverUrl
+                require(url.startsWith("https://covers.openlibrary.org/") || url.startsWith("https://coverartarchive.org/")) { "Unknown cover provider." }
+                val bytes = readUrl(url, 5 * 1024 * 1024)
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0) { "No usable cover image was found." }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+                val bitmap = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }))
+                try {
+                    check(file.parentFile!!.isDirectory || file.parentFile!!.mkdirs()) { "Could not prepare photo storage." }
+                    file.outputStream().use { require(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it)) }
+                    coroutineContext.ensureActive()
+                    file.name
+                } finally { bitmap.recycle() }
+            }
         } catch (error: Exception) { file.delete(); throw error }
-        finally { bitmap.recycle() }
     }
 
     private fun readUrl(address: String, limit: Int): ByteArray {
