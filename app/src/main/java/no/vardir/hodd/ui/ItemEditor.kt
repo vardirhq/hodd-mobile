@@ -257,11 +257,12 @@ internal fun ItemEditor(
                     scope.launch { manualEntry.bringIntoView() }
                 },
                 onCatalogTitle = { title = it }, onCopyReviewed = { platform, edition ->
+                    val keptBrand = attributes["platformBrand"].takeIf { platform == attributes["platform"] }
                     attributes = attributes.toMutableMap().apply {
                         remove("platform"); remove("platformBrand"); remove("edition")
                         if (platform.isNotBlank()) {
                             put("platform", platform)
-                            FieldChoices.brandFor(platform)?.let { put("platformBrand", it) }
+                            (FieldChoices.brandFor(platform) ?: keptBrand)?.let { put("platformBrand", it) }
                         }
                         if (edition.isNotBlank()) put("edition", edition)
                     }

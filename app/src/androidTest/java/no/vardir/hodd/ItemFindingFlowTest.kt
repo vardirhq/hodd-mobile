@@ -97,6 +97,21 @@ class ItemFindingFlowTest {
         assertEquals("", saved!!.releaseYear)
     }
 
+    @Test fun decliningCatalogTitleKeepsMyTitleAndCustomCopyChoices() {
+        editor(CatalogItem(collectionId = "s", title = "My special copy", kind = "Game",
+            attributes = mapOf("platform" to "Custom handheld", "platformBrand" to "My brand", "edition" to "Signed")))
+        compose.onNodeWithText("Find matches").performScrollTo().performClick(); waitFor("Choose a match")
+        compose.onNodeWithText(match.title).performClick()
+        compose.onNodeWithText("Use catalog title").performScrollTo()
+        compose.onNodeWithTag("use-catalog-title").performClick()
+        compose.onNodeWithText("Use details").performClick()
+        compose.onNodeWithText("Save changes").performClick()
+        assertEquals("My special copy", saved!!.title)
+        assertEquals("Custom handheld", saved!!.attributes["platform"])
+        assertEquals("My brand", saved!!.attributes["platformBrand"])
+        assertEquals("Signed", saved!!.attributes["edition"])
+    }
+
     @Test fun cancelingLookupPreventsLateMatchAndKeepsDraftUsable() {
         val pending = CompletableDeferred<List<ItemSuggestion>>()
         val source = object : ItemMetadataSource {

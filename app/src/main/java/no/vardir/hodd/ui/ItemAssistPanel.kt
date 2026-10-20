@@ -229,7 +229,7 @@ internal fun ItemAssistPanel(
         AlertDialog(onDismissRequest = { if (!running) selected = null }, title = { Text("Review details") }, text = {
             Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(title, { title = it.take(300) }, label = { Text("Catalog title") }, enabled = !running, modifier = Modifier.fillMaxWidth())
-                Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(useTitle, { useTitle = it }, enabled = !running); Text("Use catalog title", style = MaterialTheme.typography.bodySmall) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(useTitle, { useTitle = it }, enabled = !running, modifier = Modifier.testTag("use-catalog-title")); Text("Use catalog title", style = MaterialTheme.typography.bodySmall) }
                 OutlinedTextField(creator, { creator = it.take(300) }, label = { Text("Creator") }, enabled = !running, modifier = Modifier.fillMaxWidth())
                 if (item.kind == "Game") {
                     SearchableChoice("match-platform", "Platform of your copy", platform, FieldChoices.platforms.map { FieldChoice(it.name) }, enabled = !running) { platform = it }
