@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,12 +38,13 @@ import no.vardir.hodd.core.withSuggestion
 import no.vardir.hodd.data.LocalItemAssistant
 import no.vardir.hodd.data.ProductLinkImporter
 import no.vardir.hodd.data.ProductLinkSource
+import no.vardir.hodd.data.ItemMetadataSource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemEditor(
     existing: CatalogItem?, collections: List<Collection>, preferredCollectionId: String?, busy: Boolean,
@@ -49,6 +52,8 @@ internal fun ItemEditor(
     save: (CatalogItem) -> Unit, cancel: () -> Unit, message: (String) -> Unit,
     savedItems: List<CatalogItem> = emptyList(),
     productLinks: ProductLinkSource = ProductLinkImporter,
+    metadataRepository: ItemMetadataSource? = null,
+    assistant: LocalItemAssistant? = null,
     fieldCamera: @Composable (String, File, (File) -> Unit, () -> Unit, (String) -> Unit) -> Unit = { field, file, captured, cancelled, error ->
         GuidedFieldCamera(field, file, captured, cancelled, error)
     },
@@ -58,6 +63,7 @@ internal fun ItemEditor(
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val editorScroll = rememberScrollState()
+    val manualEntry = remember { BringIntoViewRequester() }
     val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
     DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
     var fieldScan by remember { mutableStateOf<String?>(null) }
@@ -91,6 +97,8 @@ internal fun ItemEditor(
         createdPhotos.clear()
     }
     var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
+    var storeSearch by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
+    var editingStorePhoto by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var fetchingProduct by remember { mutableStateOf(false) }
     var assisting by remember { mutableStateOf(false) }
@@ -200,10 +208,11 @@ internal fun ItemEditor(
                 else photoName = editedName
                 if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
                 createdPhotos.add(editedName)
-                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; offerIdentification = true
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
+                offerIdentification = !editingStorePhoto; editingStorePhoto = false
             }, onCancel = {
                 if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
-                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; editingStorePhoto = false
             }, message = message)
             return
         }
@@ -223,16 +232,52 @@ internal fun ItemEditor(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(editorScroll).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
-            Text("Read a cover, identify an item, or add details yourself. Your collection is stored on this device.", color = Muted)
+            Text("Find the item, check your copy, then save it to your collection. You can also enter everything manually.", color = Muted)
+            val canChoose = !busy && !importing && !assisting && !fetchingProduct
+            SearchableChoice("kind", "Type", kind, FieldChoices.kinds, enabled = canChoose, optional = false, custom = false) { kind = it }
+            ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing && !fetchingProduct, apply = { suggestion, replace, downloadedCover ->
+                val next = draft.withSuggestion(suggestion, replace)
+                title = next.title; creator = next.creator; kind = suggestion.kind.ifBlank { next.kind }; format = next.format
+                barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
+                subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
+                metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
+                if (downloadedCover != null) {
+                    createdPhotos.add(downloadedCover)
+                    editingPhoto = downloadedCover; editingTemporary = true; editingStorePhoto = true
+                    addingAdditional = false; editingAdditional = null
+                    focusManager.clearFocus(); keyboard?.hide()
+                }
+            }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false },
+                metadataRepository = metadataRepository, assistant = assistant,
+                storeSearch = storeSearch, onStoreSearchStarted = { storeSearch = null },
+                onManualEntry = { searchTitle, searchKind ->
+                    if (searchTitle.isNotBlank()) title = searchTitle
+                    kind = searchKind
+                    focusManager.clearFocus(); keyboard?.hide()
+                    scope.launch { manualEntry.bringIntoView() }
+                },
+                onCatalogTitle = { title = it }, onCopyReviewed = { platform, edition ->
+                    val keptBrand = attributes["platformBrand"].takeIf { platform == attributes["platform"] }
+                    attributes = attributes.toMutableMap().apply {
+                        remove("platform"); remove("platformBrand"); remove("edition")
+                        if (platform.isNotBlank()) {
+                            put("platform", platform)
+                            (FieldChoices.brandFor(platform) ?: keptBrand)?.let { put("platformBrand", it) }
+                        }
+                        if (edition.isNotBlank()) put("edition", edition)
+                    }
+                })
+
             ProductLinkPanel(draft, enabled = !busy && !importing && !assisting, source = productLinks, photo = photo,
-                working = { fetchingProduct = it }, message = message, apply = { suggestion, imageName ->
+                working = { fetchingProduct = it }, message = message,
+                onFindMatches = if (kind in searchableKinds) ({ searchTitle -> storeSearch = searchTitle }) else null, apply = { suggestion, imageName ->
                     val next = draft.withSuggestion(suggestion)
                     title = next.title; publisher = next.publisher; notes = next.notes; attributes = next.attributes
                     metadataSource = next.metadataSource; metadataUrl = next.metadataUrl
                     if (imageName != null) {
                         createdPhotos.add(imageName)
                         editingAdditional = null; addingAdditional = photoName != null
-                        editingPhoto = imageName; editingTemporary = true
+                        editingPhoto = imageName; editingTemporary = true; editingStorePhoto = true
                         focusManager.clearFocus(); keyboard?.hide()
                     }
                 })
@@ -289,16 +334,14 @@ internal fun ItemEditor(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth().bringIntoViewRequester(manualEntry), singleLine = true) }
                 scanAction("Title")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
                 scanAction("Creator")
             }
-            val canChoose = !busy && !assisting && !importing && !fetchingProduct
             SearchableChoice("collection", "Collection", selectedCollection, collections.map { FieldChoice(it.id, it.name) }, enabled = canChoose, optional = false, custom = false) { selectedCollection = it }
-            SearchableChoice("kind", "Type", kind, FieldChoices.kinds, enabled = canChoose, optional = false, custom = false) { kind = it }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { SearchableChoice("format", "Format / edition", format, FieldChoices.formats(kind), enabled = canChoose,
                     saved = savedItems.filter { it.kind == kind }.map { it.format }) { format = it } }
@@ -411,14 +454,6 @@ internal fun ItemEditor(
                 else OutlinedTextField(attributes[key].orEmpty(), { value -> attribute(key, value) }, label = { Text(label) },
                     modifier = Modifier.fillMaxWidth(), enabled = canChoose, singleLine = true)
             }
-            ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing && !fetchingProduct, apply = { suggestion, replace, downloadedCover ->
-                val next = draft.withSuggestion(suggestion, replace)
-                title = next.title; creator = next.creator; kind = next.kind; format = next.format
-                barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
-                subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
-                metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
-                if (downloadedCover != null) photoName = downloadedCover
-            }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false })
             Text("On your shelf", style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ItemStatus.entries.forEach { value -> FilterChip(selected = status == value, onClick = { statusName = value.name }, label = { Text(value.label) }) }

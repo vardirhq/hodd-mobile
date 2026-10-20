@@ -4,6 +4,15 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.11] - 2026-10-20
+
+### Changed
+- Start adding an item with a title search and choose a catalog match before reviewing your copy.
+- Cover recognition and local AI descriptions suggest an editable search title rather than applying unverified item details.
+- Store imports can search the catalog after review and image editing, combining store covers with Wikidata game/movie facts.
+- Review the platform and edition of a game separately. Keep the work's first release year as labeled evidence unless you explicitly use it for your copy.
+- Downloaded catalog artwork opens in the photo editor and stays tracked for unsaved-draft cleanup.
+
 ## [0.1.0-alpha.10] - 2026-10-20
 
 ### Added

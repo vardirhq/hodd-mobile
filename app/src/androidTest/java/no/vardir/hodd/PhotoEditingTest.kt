@@ -201,9 +201,9 @@ class PhotoEditingTest {
         compose.onNodeWithText("Use photo").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("Find details from this photo?").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Identify photo").performClick()
-        compose.waitUntil(20000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
         assertNull(saved)
-        compose.onNodeWithText("THE HOBBIT").assertExists()
+        compose.onNodeWithTag("review-search-query").assertTextContains("THE HOBBIT")
         assertEquals(before, digest(source))
     }
 }
