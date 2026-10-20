@@ -49,7 +49,7 @@ class ItemAssistanceTest {
         compose.onNodeWithText("Suggest search title").performScrollTo().performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
         assertNull(applied)
-        compose.onNodeWithText("The Hobbit").assertExists()
+        compose.onNodeWithTag("review-search-query").assertTextContains("The Hobbit")
         compose.onNodeWithText("Use details").assertDoesNotExist()
         compose.onNodeWithText("Back to item").performClick()
         assertNull(applied)
@@ -249,13 +249,13 @@ class ItemAssistanceTest {
         compose.onNodeWithText("Read cover").performScrollTo().performClick()
         compose.waitUntil(15000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, queries); assertNull(applied)
-        compose.onAllNodesWithText("Search title").onLast().performTextReplacement("Super Mario Odyssey")
+        compose.onNodeWithTag("review-search-query").performTextReplacement("Super Mario Odyssey")
         compose.onNodeWithTag("choice-search-kind").performScrollTo().performClick()
         compose.onNodeWithText("Game", substring = false).performClick()
-        compose.onNodeWithText("Find matches").performClick()
+        compose.onNodeWithTag("review-find-matches").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("Choose a match").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(1, queries); assertNull(applied)
-        compose.onNodeWithText("Super Mario Odyssey").performClick()
+        compose.onNodeWithTag("catalog-match-Super Mario Odyssey").performClick()
         val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(directory, "17-cover-review.png").outputStream().use {
             compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)

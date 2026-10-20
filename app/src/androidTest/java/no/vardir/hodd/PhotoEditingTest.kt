@@ -203,7 +203,7 @@ class PhotoEditingTest {
         compose.onNodeWithText("Identify photo").performClick()
         compose.waitUntil(20000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
         assertNull(saved)
-        compose.onNodeWithText("THE HOBBIT").assertExists()
+        compose.onNodeWithTag("review-search-query").assertTextContains("THE HOBBIT")
         assertEquals(before, digest(source))
     }
 }

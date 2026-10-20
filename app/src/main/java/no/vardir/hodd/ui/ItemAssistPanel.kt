@@ -184,7 +184,7 @@ internal fun ItemAssistPanel(
     if (reviewSearch) AlertDialog(onDismissRequest = { if (!running) reviewSearch = false }, title = { Text("Review search") }, text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Correct the title before searching. Recognition is a starting point; it has not changed your item.", style = MaterialTheme.typography.bodySmall)
-            OutlinedTextField(query, { query = it.take(300); queryEdited = true }, label = { Text("Search title") }, enabled = !running, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(query, { query = it.take(300); queryEdited = true }, label = { Text("Search title") }, enabled = !running, modifier = Modifier.fillMaxWidth().testTag("review-search-query"))
             SearchableChoice("search-kind", "Search type", queryKind, FieldChoices.kinds, enabled = !running, optional = false, custom = false) {
                 if (queryKind != it) queryPlatform = ""
                 queryKind = it
@@ -199,13 +199,13 @@ internal fun ItemAssistPanel(
             if (recognitionNote.isNotBlank()) Text(recognitionNote, style = MaterialTheme.typography.bodySmall, color = Muted)
             if (running) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(progress) }
         }
-    }, confirmButton = { TextButton(onClick = ::findMatches, enabled = !running && queryKind in searchableKinds && query.isNotBlank()) { Text("Find matches") } },
+    }, confirmButton = { TextButton(onClick = ::findMatches, enabled = !running && queryKind in searchableKinds && query.isNotBlank(), modifier = Modifier.testTag("review-find-matches")) { Text("Find matches") } },
         dismissButton = { TextButton(onClick = { job?.cancel(); reviewSearch = false }) { Text("Back to item") } })
 
     if (suggestions.isNotEmpty() && selected == null) AlertDialog(onDismissRequest = { suggestions = emptyList() }, title = { Text("Choose a match") }, text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Results for “$query”. Check the year and platforms; originals, sequels and remakes can share names.", style = MaterialTheme.typography.bodySmall)
-            suggestions.forEach { item -> OutlinedCard(onClick = { selected = item }, modifier = Modifier.fillMaxWidth()) {
+            suggestions.forEach { item -> OutlinedCard(onClick = { selected = item }, modifier = Modifier.fillMaxWidth().testTag("catalog-match-${item.sourceId.ifBlank { item.title }}")) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(item.title, style = MaterialTheme.typography.titleMedium)
                     if (item.creator.isNotBlank()) Text(item.creator)
