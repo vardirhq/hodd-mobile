@@ -83,6 +83,7 @@ fun CatalogItem.withSuggestion(suggestion: ItemSuggestion, replace: Boolean = fa
     fun merge(current: String, proposed: String) = if (proposed.isNotBlank() && (replace || current.isBlank())) proposed else current
     val nextStatus = if (replace || title.isBlank()) ItemStatus.entries.find { it.name == suggestion.status } ?: status else status
     val borrower = merge(lentTo, suggestion.lentTo)
+    val fillProductSource = suggestion.source == "Product link" && metadataSource.isBlank() && metadataUrl.isBlank() && metadataId.isBlank()
     return copy(
         title = if (suggestion.source == "Wikidata" && title.equals(suggestion.title, ignoreCase = true)) suggestion.title else merge(title, suggestion.title),
         creator = merge(creator, suggestion.creator),
@@ -96,8 +97,10 @@ fun CatalogItem.withSuggestion(suggestion: ItemSuggestion, replace: Boolean = fa
         language = merge(language, suggestion.language), releaseYear = merge(releaseYear, suggestion.releaseYear),
         condition = merge(condition, suggestion.condition),
         attributes = attributes.toMutableMap().apply { suggestion.attributes.forEach { (key, value) -> if (value.isNotBlank() && (replace || this[key].isNullOrBlank())) this[key] = value } },
-        metadataSource = suggestion.source.takeIf { it in listOf("Open Library", "MusicBrainz", "Wikidata") } ?: metadataSource,
-        metadataId = suggestion.sourceId.ifBlank { metadataId }, metadataUrl = suggestion.sourceUrl.ifBlank { metadataUrl },
+        metadataSource = if (suggestion.source == "Product link") (if (fillProductSource) "Product link" else metadataSource)
+            else suggestion.source.takeIf { it in listOf("Open Library", "MusicBrainz", "Wikidata") } ?: metadataSource,
+        metadataId = suggestion.sourceId.ifBlank { metadataId },
+        metadataUrl = if (suggestion.source == "Product link") (if (fillProductSource) suggestion.sourceUrl else metadataUrl) else suggestion.sourceUrl.ifBlank { metadataUrl },
     )
 }
 

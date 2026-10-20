@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,18 +36,24 @@ import no.vardir.hodd.core.FieldChoice
 import no.vardir.hodd.core.ItemStatus
 import no.vardir.hodd.core.withSuggestion
 import no.vardir.hodd.data.LocalItemAssistant
+import no.vardir.hodd.data.ProductLinkImporter
+import no.vardir.hodd.data.ProductLinkSource
+import no.vardir.hodd.data.ItemMetadataSource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemEditor(
     existing: CatalogItem?, collections: List<Collection>, preferredCollectionId: String?, busy: Boolean,
     photo: (String?) -> File?, importPhoto: (Uri, (String?) -> Unit) -> Unit,
     save: (CatalogItem) -> Unit, cancel: () -> Unit, message: (String) -> Unit,
     savedItems: List<CatalogItem> = emptyList(),
+    productLinks: ProductLinkSource = ProductLinkImporter,
+    metadataRepository: ItemMetadataSource? = null,
+    assistant: LocalItemAssistant? = null,
     fieldCamera: @Composable (String, File, (File) -> Unit, () -> Unit, (String) -> Unit) -> Unit = { field, file, captured, cancelled, error ->
         GuidedFieldCamera(field, file, captured, cancelled, error)
     },
@@ -55,6 +63,7 @@ internal fun ItemEditor(
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val editorScroll = rememberScrollState()
+    val manualEntry = remember { BringIntoViewRequester() }
     val fieldAssistant = remember { LocalItemAssistant(context.applicationContext) }
     DisposableEffect(fieldAssistant) { onDispose { fieldAssistant.close() } }
     var fieldScan by remember { mutableStateOf<String?>(null) }
@@ -88,7 +97,10 @@ internal fun ItemEditor(
         createdPhotos.clear()
     }
     var offerIdentification by rememberSaveable(draftId) { mutableStateOf(false) }
+    var storeSearch by rememberSaveable(draftId) { mutableStateOf<String?>(null) }
+    var editingStorePhoto by rememberSaveable(draftId) { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var fetchingProduct by remember { mutableStateOf(false) }
     var assisting by remember { mutableStateOf(false) }
     var metadataSource by rememberSaveable(draftId) { mutableStateOf(existing?.metadataSource.orEmpty()) }
     var metadataId by rememberSaveable(draftId) { mutableStateOf(existing?.metadataId.orEmpty()) }
@@ -106,7 +118,7 @@ internal fun ItemEditor(
     val status = ItemStatus.valueOf(statusName)
     val draft = CatalogItem(draftId, selectedCollection, title, creator, kind, format, barcode, status, notes, if (status == ItemStatus.LENT) lentTo else "", photoName, addedAt, metadataSource, metadataId, metadataUrl, subtitle, series, volume, publisher, language, releaseYear, condition, attributes, photoNames, tags, location)
     val dirty = if (existing != null) draft != existing else title.isNotBlank() || creator.isNotBlank() || barcode.isNotBlank() || notes.isNotBlank() || tags.isNotEmpty() || location.isNotBlank() || format.isNotBlank() || lentTo.isNotBlank() || kind != "Book" || status != ItemStatus.OWNED || photoName != null || photoNames.isNotEmpty() || subtitle.isNotBlank() || series.isNotBlank() || volume.isNotBlank() || publisher.isNotBlank() || language.isNotBlank() || releaseYear.isNotBlank() || condition.isNotBlank() || attributes.isNotEmpty()
-    fun close() { if (!busy && !importing && !assisting) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
+    fun close() { if (!busy && !importing && !assisting && !fetchingProduct) { if (dirty) discard = true else { discardUnsavedPhotos(); cancel() } } }
     BackHandler { close() }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { barcode = it; message("Identifier inserted.") }
@@ -162,7 +174,7 @@ internal fun ItemEditor(
             lastScanField = field
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) fieldScan = field
             else fieldPermission.launch(Manifest.permission.CAMERA)
-        }, enabled = !busy && !assisting && !importing) {
+        }, enabled = !busy && !assisting && !importing && !fetchingProduct) {
             Icon(Icons.Outlined.DocumentScanner, "Scan " + field)
         }
     }
@@ -196,42 +208,93 @@ internal fun ItemEditor(
                 else photoName = editedName
                 if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
                 createdPhotos.add(editedName)
-                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; offerIdentification = true
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
+                offerIdentification = !editingStorePhoto; editingStorePhoto = false
             }, onCancel = {
                 if (editingTemporary) { source.delete(); createdPhotos.remove(sourceName) }
-                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false
+                editingPhoto = null; editingTemporary = false; editingAdditional = null; addingAdditional = false; editingStorePhoto = false
             }, message = message)
             return
         }
     }
     Scaffold(
-        topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Close, "Cancel") } }) },
+        topBar = { TopAppBar(title = { Text(if (existing == null) "A new find" else "Edit item", style = MaterialTheme.typography.titleLarge) }, navigationIcon = { IconButton(onClick = ::close, enabled = !busy && !importing && !assisting && !fetchingProduct) { Icon(Icons.Outlined.Close, "Cancel") } }) },
         bottomBar = {
             Surface(shadowElevation = 8.dp, modifier = Modifier.navigationBarsPadding()) {
-                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
-                    if (busy || importing || assisting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                    else { Icon(Icons.Outlined.Check, null); Spacer(Modifier.width(8.dp)); Text(if (existing == null) "Save to collection" else "Save changes") }
+                Button(onClick = { save(draft) }, enabled = title.isNotBlank() && !busy && !importing && !assisting && !fetchingProduct && (status != ItemStatus.LENT || lentTo.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).heightIn(min = 52.dp)) {
+                    if (busy || importing || assisting || fetchingProduct) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                    else Icon(Icons.Outlined.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (existing == null) "Save to collection" else "Save changes")
                 }
             }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(editorScroll).padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Make it part of your story.", style = MaterialTheme.typography.headlineMedium)
-            Text("Read a cover, identify an item, or add details yourself. Your collection is stored on this device.", color = Muted)
+            Text("Find the item, check your copy, then save it to your collection. You can also enter everything manually.", color = Muted)
+            val canChoose = !busy && !importing && !assisting && !fetchingProduct
+            SearchableChoice("kind", "Type", kind, FieldChoices.kinds, enabled = canChoose, optional = false, custom = false) { kind = it }
+            ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing && !fetchingProduct, apply = { suggestion, replace, downloadedCover ->
+                val next = draft.withSuggestion(suggestion, replace)
+                title = next.title; creator = next.creator; kind = suggestion.kind.ifBlank { next.kind }; format = next.format
+                barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
+                subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
+                metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
+                if (downloadedCover != null) {
+                    createdPhotos.add(downloadedCover)
+                    editingPhoto = downloadedCover; editingTemporary = true; editingStorePhoto = true
+                    addingAdditional = false; editingAdditional = null
+                    focusManager.clearFocus(); keyboard?.hide()
+                }
+            }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false },
+                metadataRepository = metadataRepository, assistant = assistant,
+                storeSearch = storeSearch, onStoreSearchStarted = { storeSearch = null },
+                onManualEntry = { searchTitle, searchKind ->
+                    if (searchTitle.isNotBlank()) title = searchTitle
+                    kind = searchKind
+                    focusManager.clearFocus(); keyboard?.hide()
+                    scope.launch { manualEntry.bringIntoView() }
+                },
+                onCatalogTitle = { title = it }, onCopyReviewed = { platform, edition ->
+                    val keptBrand = attributes["platformBrand"].takeIf { platform == attributes["platform"] }
+                    attributes = attributes.toMutableMap().apply {
+                        remove("platform"); remove("platformBrand"); remove("edition")
+                        if (platform.isNotBlank()) {
+                            put("platform", platform)
+                            (FieldChoices.brandFor(platform) ?: keptBrand)?.let { put("platformBrand", it) }
+                        }
+                        if (edition.isNotBlank()) put("edition", edition)
+                    }
+                })
+
+            ProductLinkPanel(draft, enabled = !busy && !importing && !assisting, source = productLinks, photo = photo,
+                working = { fetchingProduct = it }, message = message,
+                onFindMatches = if (kind in searchableKinds) ({ searchTitle -> storeSearch = searchTitle }) else null, apply = { suggestion, imageName ->
+                    val next = draft.withSuggestion(suggestion)
+                    title = next.title; publisher = next.publisher; notes = next.notes; attributes = next.attributes
+                    metadataSource = next.metadataSource; metadataUrl = next.metadataUrl
+                    if (imageName != null) {
+                        createdPhotos.add(imageName)
+                        editingAdditional = null; addingAdditional = photoName != null
+                        editingPhoto = imageName; editingTemporary = true; editingStorePhoto = true
+                        focusManager.clearFocus(); keyboard?.hide()
+                    }
+                })
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Cover(draft.copy(title = title.ifBlank { "Your next find" }), photo(photoName), Modifier.width(95.dp).height(130.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Your cover", style = MaterialTheme.typography.titleMedium)
                     Text("Use a photo or keep the simple cover.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Choose photo") }
+                    TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Icon(Icons.Outlined.PhotoLibrary, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Choose photo") }
                     TextButton(onClick = {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
                         else cameraPermission.launch(Manifest.permission.CAMERA)
-                    }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
+                    }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Take photo") }
                     if (photoName != null) TextButton(onClick = {
                         focusManager.clearFocus(); keyboard?.hide(); editingPhoto = photoName; editingTemporary = false
-                    }, enabled = !busy && !importing && !assisting) { Icon(Icons.Outlined.Crop, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Edit photo") }
-                    if (photoName != null) TextButton(onClick = { photoName = photoNames.firstOrNull(); photoNames = photoNames.drop(1) }, enabled = !busy && !importing && !assisting) { Text("Remove photo") }
+                    }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Icon(Icons.Outlined.Crop, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Edit photo") }
+                    if (photoName != null) TextButton(onClick = { photoName = photoNames.firstOrNull(); photoNames = photoNames.drop(1) }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Text("Remove photo") }
                 }
             }
             if (photoName != null || photoNames.isNotEmpty()) {
@@ -245,19 +308,19 @@ internal fun ItemEditor(
                                 val oldCover = photoName
                                 photoName = extra
                                 photoNames = photoNames.filterNot { it == extra } + listOfNotNull(oldCover)
-                            }) { Text("Set as cover") }
+                            }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Text("Set as cover") }
                         }
-                        IconButton(onClick = { editingAdditional = extra; editingPhoto = extra; editingTemporary = false }, enabled = !busy) {
+                        IconButton(onClick = { editingAdditional = extra; editingPhoto = extra; editingTemporary = false }, enabled = !busy && !importing && !assisting && !fetchingProduct) {
                             Icon(Icons.Outlined.Crop, "Edit additional photo")
                         }
-                        IconButton(onClick = { photoNames = photoNames.filterNot { it == extra } }, enabled = !busy) {
+                        IconButton(onClick = { photoNames = photoNames.filterNot { it == extra } }, enabled = !busy && !importing && !assisting && !fetchingProduct) {
                             Icon(Icons.Outlined.Delete, "Remove additional photo")
                         }
                     }
                 }
                 if (photoNames.size < 20) {
                     Row {
-                        TextButton(onClick = { addingAdditional = true; gallery.launch("image/*") }, enabled = !busy && !importing && !assisting) {
+                        TextButton(onClick = { addingAdditional = true; gallery.launch("image/*") }, enabled = !busy && !importing && !assisting && !fetchingProduct) {
                             Icon(Icons.Outlined.Add, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Add photo")
@@ -266,21 +329,19 @@ internal fun ItemEditor(
                             addingAdditional = true
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) takePhoto()
                             else cameraPermission.launch(Manifest.permission.CAMERA)
-                        }, enabled = !busy && !importing && !assisting) { Text("Take another") }
+                        }, enabled = !busy && !importing && !assisting && !fetchingProduct) { Text("Take another") }
                     }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+                Box(Modifier.weight(1f)) { OutlinedTextField(title, { title = it }, label = { Text("Title *") }, modifier = Modifier.fillMaxWidth().bringIntoViewRequester(manualEntry), singleLine = true) }
                 scanAction("Title")
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { OutlinedTextField(creator, { creator = it }, label = { Text("Creator / author") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
                 scanAction("Creator")
             }
-            val canChoose = !busy && !assisting && !importing
             SearchableChoice("collection", "Collection", selectedCollection, collections.map { FieldChoice(it.id, it.name) }, enabled = canChoose, optional = false, custom = false) { selectedCollection = it }
-            SearchableChoice("kind", "Type", kind, FieldChoices.kinds, enabled = canChoose, optional = false, custom = false) { kind = it }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { SearchableChoice("format", "Format / edition", format, FieldChoices.formats(kind), enabled = canChoose,
                     saved = savedItems.filter { it.kind == kind }.map { it.format }) { format = it } }
@@ -393,14 +454,6 @@ internal fun ItemEditor(
                 else OutlinedTextField(attributes[key].orEmpty(), { value -> attribute(key, value) }, label = { Text(label) },
                     modifier = Modifier.fillMaxWidth(), enabled = canChoose, singleLine = true)
             }
-            ItemAssistPanel(draft, photo(photoName), enabled = !busy && !importing, apply = { suggestion, replace, downloadedCover ->
-                val next = draft.withSuggestion(suggestion, replace)
-                title = next.title; creator = next.creator; kind = next.kind; format = next.format
-                barcode = next.barcode; notes = next.notes; statusName = next.status.name; lentTo = next.lentTo
-                subtitle = next.subtitle; series = next.series; volume = next.volume; publisher = next.publisher; language = next.language; releaseYear = next.releaseYear; condition = next.condition; attributes = next.attributes
-                metadataSource = next.metadataSource; metadataId = next.metadataId; metadataUrl = next.metadataUrl
-                if (downloadedCover != null) photoName = downloadedCover
-            }, working = { assisting = it }, message = message, offerIdentification = offerIdentification, onIdentificationOffered = { offerIdentification = false })
             Text("On your shelf", style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ItemStatus.entries.forEach { value -> FilterChip(selected = status == value, onClick = { statusName = value.name }, label = { Text(value.label) }) }
@@ -413,7 +466,7 @@ internal fun ItemEditor(
                 IconButton(onClick = {
                     try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES).setPrompt("Scan EAN or ISBN").setBeepEnabled(false).setOrientationLocked(false)) }
                     catch (_: Exception) { message("Camera unavailable. Enter the identifier manually.") }
-                }, enabled = !busy && !assisting) { Icon(Icons.Outlined.QrCodeScanner, "Scan EAN / ISBN") }
+                }, enabled = !busy && !assisting && !fetchingProduct) { Icon(Icons.Outlined.QrCodeScanner, "Scan EAN / ISBN") }
             }
             OutlinedTextField(notes, { notes = it }, label = { Text("Notes / condition") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
         }

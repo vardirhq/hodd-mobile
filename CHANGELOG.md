@@ -4,6 +4,41 @@ Notable changes are grouped by version. Work in progress goes under Unreleased; 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.11] - 2026-10-20
+
+### Changed
+- Start adding an item with a title search and choose a catalog match before reviewing your copy.
+- Cover recognition and local AI descriptions suggest an editable search title rather than applying unverified item details.
+- Store imports can search the catalog after review and image editing, combining store covers with Wikidata game/movie facts.
+- Review the platform and edition of a game separately. Keep the work's first release year as labeled evidence unless you explicitly use it for your copy.
+- Downloaded catalog artwork opens in the photo editor and stays tracked for unsaved-draft cleanup.
+
+## [0.1.0-alpha.10] - 2026-10-20
+
+### Added
+- A visible store browser with JavaScript and first-party cookies for pages that direct fetching cannot read.
+- Import this product reads bounded metadata from the displayed page into the existing product/field review; no server is required.
+
+### Fixed
+- Keep WebView loading/callback application on the Android main thread and clip the embedded page to its viewport.
+- Keep the store browser import button above Android navigation controls using native dialog/window geometry when Compose insets are consumed.
+- Browser challenge pages without product metadata do not become item suggestions.
+- Browser cancellation and navigation invalidate pending extraction; file/content access, mixed content and native JavaScript bridges are disabled.
+
+## [0.1.0-alpha.9] - 2026-10-20
+
+### Added
+- On-device store-link import with reviewed field selection, separate brand/publisher data and dated retail-price/source evidence.
+- Main-product/URL selection and an explicit product/variant picker for ambiguous structured metadata; Open Graph fallback.
+- Optional bounded image preview followed by the existing photo editor; existing covers are retained when adding a store image.
+
+### Fixed
+- Explain store refusals and respect HTTP 429/Retry-After cooldowns without automatic retries; offer a browser/manual fallback.
+- Store requests block competing save/photo actions and support cancellation without late application or leftover staged images.
+- ImageObject URLs and linked JSON-LD references are resolved; descriptions are converted to plain text and aggregate prices are labeled.
+- Existing user edits and catalog provenance survive product imports.
+- Android CI validates a successful nonempty test summary without a hardcoded suite size, while rejecting failure/crash results.
+
 ## [0.1.0-alpha.8] - 2026-10-19
 
 ### Added
