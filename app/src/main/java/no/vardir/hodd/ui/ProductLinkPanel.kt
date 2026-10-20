@@ -142,9 +142,9 @@ internal fun ProductLinkPanel(
         var findCatalog by remember(item) { mutableStateOf(onFindMatches != null && draft.metadataId.isBlank()) }
         var searchTitle by remember(item) { mutableStateOf(catalogSearchTitle(item.title)) }
         var useTitle by remember(item) { mutableStateOf(draft.title.isBlank()) }
-        var useDescription by remember(item) { mutableStateOf(draft.notes.isBlank()) }
+        var useDescription by remember(item) { mutableStateOf(draft.notes.isBlank() && !(draft.kind == "Game" && findCatalog)) }
         var useBrand by remember(item) { mutableStateOf(draft.attributes["brand"].isNullOrBlank()) }
-        var usePublisher by remember(item) { mutableStateOf(draft.publisher.isBlank()) }
+        var usePublisher by remember(item) { mutableStateOf(draft.publisher.isBlank() && !(draft.kind == "Game" && findCatalog)) }
         val priceEmpty = draft.attributes["storePrice"].isNullOrBlank() && draft.attributes["Store price"].isNullOrBlank()
         var usePrice by remember(item) { mutableStateOf(priceEmpty) }
         var useImage by remember(item) { mutableStateOf(false) }
@@ -156,6 +156,7 @@ internal fun ProductLinkPanel(
         }
         AlertDialog(onDismissRequest = ::dismiss, title = { Text("Import product details?") }, text = {
             Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (draft.kind == "Game" && findCatalog) Text("For games, catalog facts are preferred. Store descriptions and publisher are optional so they do not fill those fields before Wikidata.", style = MaterialTheme.typography.bodySmall)
                 field("Title", item.title, useTitle, draft.title.isBlank()) { useTitle = it }
                 field("Brand", item.brand, useBrand, draft.attributes["brand"].isNullOrBlank()) { useBrand = it }
                 field("Publisher", item.publisher, usePublisher, draft.publisher.isBlank()) { usePublisher = it }

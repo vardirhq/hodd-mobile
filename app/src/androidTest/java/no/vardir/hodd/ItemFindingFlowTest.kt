@@ -68,7 +68,7 @@ class ItemFindingFlowTest {
 
     @Test fun storeImportEditsCoverThenFindsCatalogMatchesWithoutAnotherOcrOffer() {
         val source = object : ProductLinkSource {
-            override suspend fun preview(url: String) = listOf(ProductPreview("SUPER MARIO MAKER 2 - Nintendo Switch", "", "https://shop.example/cover.jpg", "", "", "", url))
+            override suspend fun preview(url: String) = listOf(ProductPreview("SUPER MARIO MAKER 2 - Nintendo Switch", "Retail marketing", "https://shop.example/cover.jpg", "", "", "", url, publisher = "Retail distributor"))
             override suspend fun prepareImage(url: String, target: File) {
                 val bitmap = Bitmap.createBitmap(200, 300, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
                 target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }; bitmap.recycle()
@@ -79,6 +79,7 @@ class ItemFindingFlowTest {
         compose.onNodeWithText("Product page URL").performScrollTo().performTextInput("https://shop.example/item")
         compose.onNodeWithText("Fetch product details").performScrollTo().performClick(); waitFor("Import product details?")
         compose.onNodeWithTag("store-find-matches").assertIsOn()
+        compose.onNodeWithTag("store-field-Publisher").assertIsOff()
         compose.onNodeWithTag("store-image-checkbox").performScrollTo().performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithContentDescription("Product image preview").fetchSemanticsNodes().isNotEmpty() }
         assertTrue(queries.isEmpty())
@@ -92,6 +93,7 @@ class ItemFindingFlowTest {
         compose.onNodeWithText("Use details").performClick()
         compose.onNodeWithText("Save changes").performClick()
         assertEquals(match.title, saved!!.title); assertEquals("Wikidata", saved!!.metadataSource)
+        assertEquals("Nintendo", saved!!.publisher); assertEquals("", saved!!.notes)
         assertEquals("https://shop.example/item", saved!!.attributes["storeUrl"])
         assertTrue(File(directory, saved!!.photoName!!).isFile)
         assertEquals("", saved!!.releaseYear)

@@ -105,7 +105,7 @@ class ProductLinkFlowTest {
         editor(item(""), source(listOf(preview("Wrong product"), preview("Right product"))))
         compose.waitUntil(10000) { compose.onAllNodesWithText("Choose the product").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Right product").performClick(); waitForReview()
-        compose.onNodeWithTag("store-field-Publisher").performClick()
+        compose.onNodeWithTag("store-field-Publisher").assertIsOff()
         compose.onNodeWithTag("store-field-Store price").performScrollTo().performClick()
         compose.onNodeWithText("Use details").performClick()
         compose.onNodeWithText("Save changes").performClick()
