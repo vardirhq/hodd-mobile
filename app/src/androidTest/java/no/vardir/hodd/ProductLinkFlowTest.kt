@@ -11,6 +11,7 @@ import kotlinx.coroutines.awaitCancellation
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.Collection
 import no.vardir.hodd.data.ProductLinkSource
+import no.vardir.hodd.data.ItemMetadataSource
 import no.vardir.hodd.data.ProductPreview
 import no.vardir.hodd.ui.HoddTheme
 import no.vardir.hodd.ui.ItemEditor
@@ -38,7 +39,11 @@ class ProductLinkFlowTest {
     private fun editor(item: CatalogItem, source: ProductLinkSource) {
         compose.setContent { HoddTheme { ItemEditor(item, listOf(Collection("s", "Shelf")), "s", false,
             photo = { name -> name?.let { File(directory, it) } }, importPhoto = { _, _ -> error("Store images should not use asynchronous picker callbacks") },
-            save = { saved = it }, cancel = {}, message = { messages += it }, productLinks = source) } }
+            save = { saved = it }, cancel = {}, message = { messages += it }, productLinks = source,
+            metadataRepository = object : ItemMetadataSource {
+                override suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String) = emptyList<no.vardir.hodd.core.ItemSuggestion>()
+                override suspend fun importCover(suggestion: no.vardir.hodd.core.ItemSuggestion) = error("Not requested")
+            }) } }
         compose.onNodeWithText("Import from a store").performScrollTo().performClick()
         compose.onNodeWithText("Product page URL").performScrollTo().performTextInput("https://shop.example/item")
         compose.onNodeWithText("Fetch product details").performScrollTo().performClick()
@@ -124,8 +129,9 @@ class ProductLinkFlowTest {
         compose.waitUntil(10000) { compose.onAllNodesWithTag("photo-crop-preview").fetchSemanticsNodes().isNotEmpty() }
         assertNull(saved); assertArrayEquals(before, File(directory, "old.jpg").readBytes())
         compose.onNodeWithText("Use photo").performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("Find details from this photo?").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Not now").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Save changes").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Find details from this photo?").assertDoesNotExist()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Save changes").filter(isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Save changes").performClick()
         assertEquals("old.jpg", saved!!.photoName)
         assertEquals(1, saved!!.photoNames.size); assertTrue(File(directory, saved!!.photoNames.single()).isFile)

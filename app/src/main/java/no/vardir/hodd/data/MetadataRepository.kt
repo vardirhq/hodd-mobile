@@ -21,14 +21,19 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** Human-triggered, keyless lookups. No catalog or photos are uploaded. */
-class MetadataRepository(private val context: Context, private val transport: ((String, Int) -> ByteArray)? = null) {
+interface ItemMetadataSource {
+    suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String = ""): List<ItemSuggestion>
+    suspend fun importCover(suggestion: ItemSuggestion): String
+}
+
+class MetadataRepository(private val context: Context, private val transport: ((String, Int) -> ByteArray)? = null) : ItemMetadataSource {
     companion object {
         private val requestLock = Mutex()
         private var lastRequest = 0L
         private const val USER_AGENT = "HoddMobile/0.1 (https://github.com/vardirhq/hodd-mobile)"
     }
 
-    suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String = ""): List<ItemSuggestion> = withContext(Dispatchers.IO) {
+    override suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String): List<ItemSuggestion> = withContext(Dispatchers.IO) {
         val code = cleanBarcode(barcode)
         if (kind in listOf("Game", "Movie")) return@withContext lookupWikidata(kind, title, platform)
         val music = kind in listOf("Vinyl", "CD", "Music")
@@ -107,7 +112,7 @@ class MetadataRepository(private val context: Context, private val transport: ((
         }
     }
 
-    suspend fun importCover(suggestion: ItemSuggestion): String = withContext(Dispatchers.IO) {
+    override suspend fun importCover(suggestion: ItemSuggestion): String = withContext(Dispatchers.IO) {
         val url = suggestion.coverUrl
         require(url.startsWith("https://covers.openlibrary.org/") || url.startsWith("https://coverartarchive.org/")) { "Unknown cover provider." }
         val bytes = readUrl(url, 5 * 1024 * 1024)

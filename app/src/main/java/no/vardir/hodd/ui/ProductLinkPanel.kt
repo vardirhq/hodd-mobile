@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import no.vardir.hodd.core.CatalogItem
 import no.vardir.hodd.core.ItemSuggestion
+import no.vardir.hodd.core.catalogSearchTitle
 import no.vardir.hodd.data.ProductBrowserMetadata
 import no.vardir.hodd.data.ProductLinkSource
 import no.vardir.hodd.data.ProductPreview
@@ -34,6 +35,7 @@ private class ProductPhotoOwner { var file: File? = null }
 internal fun ProductLinkPanel(
     draft: CatalogItem, enabled: Boolean, source: ProductLinkSource, photo: (String?) -> File?,
     apply: (ItemSuggestion, String?) -> Unit, working: (Boolean) -> Unit, message: (String) -> Unit,
+    onFindMatches: ((String) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -137,6 +139,8 @@ internal fun ProductLinkPanel(
             }
         }, confirmButton = {}, dismissButton = { TextButton(onClick = ::dismiss) { Text("Cancel") } })
     selected?.let { item ->
+        var findCatalog by remember(item) { mutableStateOf(onFindMatches != null && draft.metadataId.isBlank()) }
+        var searchTitle by remember(item) { mutableStateOf(catalogSearchTitle(item.title)) }
         var useTitle by remember(item) { mutableStateOf(draft.title.isBlank()) }
         var useDescription by remember(item) { mutableStateOf(draft.notes.isBlank()) }
         var useBrand by remember(item) { mutableStateOf(draft.attributes["brand"].isNullOrBlank()) }
@@ -159,6 +163,16 @@ internal fun ProductLinkPanel(
                 field("Store price", item.priceLabel.takeIf { item.price.isNotBlank() }.orEmpty(), usePrice, priceEmpty) { usePrice = it }
                 Text("Store prices are retail listings, not collection valuations. Existing fields are kept. Nothing is saved until Save on the item form.", style = MaterialTheme.typography.bodySmall)
                 Text(item.url, style = MaterialTheme.typography.bodySmall, color = Violet)
+                if (onFindMatches != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(findCatalog, { findCatalog = it }, enabled = !running, modifier = Modifier.testTag("store-find-matches"))
+                        Text("Find catalog matches next", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (findCatalog) {
+                        OutlinedTextField(searchTitle, { searchTitle = it.take(300) }, label = { Text("Title to search") }, enabled = !running, modifier = Modifier.fillMaxWidth())
+                        Text("After accepting the image edit, search the catalog using this title. Games and movies use Wikidata. Keep the store cover and choose the right work for its metadata. Your photo is not sent.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 if (item.imageUrl.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(useImage, { checked ->
@@ -182,7 +196,8 @@ internal fun ProductLinkPanel(
             if (acceptedPhoto != null) { owner.file = null; previewPhoto = null } else clearPhoto()
             selected = null; candidates = emptyList()
             apply(chosen.suggestion(draft.kind), acceptedPhoto?.name)
-        }, enabled = !running && (!useImage || previewPhoto != null)) { Text("Use details") } },
+            if (findCatalog) onFindMatches?.invoke(searchTitle.trim())
+        }, enabled = !running && (!useImage || previewPhoto != null) && (!findCatalog || searchTitle.isNotBlank())) { Text("Use details") } },
             dismissButton = { TextButton(onClick = ::dismiss) { Text("Cancel") } })
     }
 }

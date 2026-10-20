@@ -43,23 +43,17 @@ class ItemAssistanceTest {
                 }
             }
         }
-        compose.onNodeWithText("Find and fill details").performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("Local AI ready · Gemini Nano").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Local AI options").performScrollTo().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Gemini Nano available · suggestions still need review").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Describe your item").performScrollTo().performTextInput("THE HOBBIT")
-        compose.onNodeWithText("Suggest from description").performScrollTo().performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Suggest search title").performScrollTo().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
         assertNull(applied)
-        compose.onNodeWithText("The Hobbit").performClick()
-        compose.onNodeWithText("Review details").assertExists()
-        compose.waitForIdle()
-        val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-        File(directory, "06-suggestion-review.png").outputStream().use {
-            compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
-        }
+        compose.onNodeWithText("The Hobbit").assertExists()
+        compose.onNodeWithText("Use details").assertDoesNotExist()
+        compose.onNodeWithText("Back to item").performClick()
         assertNull(applied)
-        compose.onNodeWithText("Use details").performClick()
-        compose.waitUntil(5000) { applied != null }
-        assertEquals("The Hobbit", applied!!.title)
+
     }
 
     @Test fun bookLookupUsesIsbnAndCachesResponse() = runBlocking {
@@ -144,9 +138,8 @@ class ItemAssistanceTest {
                     assistant = assistant, metadataRepository = repository)
             } }
         }
-        compose.onNodeWithText("Find and fill details").performClick()
-        compose.onNodeWithText("Find online").performScrollTo().performClick()
-        compose.waitUntil(15000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Find matches").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodesWithText("Choose a match").fetchSemanticsNodes().isNotEmpty() }
         assertNull(applied)
         compose.onNodeWithText("Super Mario Maker 2").performClick()
         compose.onNodeWithText("Publisher: Nintendo").assertExists()
@@ -237,35 +230,40 @@ class ItemAssistanceTest {
         } finally { assistant.close() }
     }
 
-    @Test fun coverTextCanBeCorrectedAndReviewedWithoutApplyingUntilConfirmation() {
+    @Test fun coverReadingOpensEditableSearchWithoutApplyingOrCallingTheCatalog() {
         val file = coverPhoto(); val assistant = LocalItemAssistant(context, StubModel(LocalAiStatus.UNAVAILABLE))
         var applied: ItemSuggestion? = null
+        var queries = 0
+        val metadata = object : ItemMetadataSource {
+            override suspend fun lookup(kind: String, barcode: String, title: String, creator: String, platform: String): List<ItemSuggestion> {
+                queries++
+                assertEquals("Super Mario Odyssey", title); assertEquals("Game", kind); assertEquals("", creator)
+                return listOf(ItemSuggestion("Super Mario Odyssey", kind = "Game", source = "Wikidata", attributes = mapOf("platform" to "Nintendo Switch")))
+            }
+            override suspend fun importCover(suggestion: ItemSuggestion) = error("Not requested")
+        }
         compose.setContent { HoddTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
             ItemAssistPanel(CatalogItem(collectionId = "shelf", title = "", kind = "Book"), file, true,
-                apply = { suggestion, _, _ -> applied = suggestion }, working = {}, message = {}, assistant = assistant)
+                apply = { suggestion, _, _ -> applied = suggestion }, working = {}, message = {}, assistant = assistant, metadataRepository = metadata)
         } } }
-        compose.onNodeWithText("Find and fill details").performClick()
         compose.onNodeWithText("Read cover").performScrollTo().performClick()
-        compose.waitUntil(15000) { compose.onAllNodesWithText("Choose a suggestion").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Review recognized text").performClick()
-        compose.onNodeWithText("Cover text").performTextReplacement("NINTENDO SWITCH\nSUPER MARIO ODYSSEY")
-        compose.onNodeWithText("Use corrected text").performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("SUPER MARIO ODYSSEY").fetchSemanticsNodes().isNotEmpty() }
-        assertNull(applied)
-        compose.onNodeWithText("SUPER MARIO ODYSSEY").performClick()
-        compose.onNodeWithText("Suggested title").performTextReplacement("Super Mario Odyssey")
-        compose.onNodeWithTag("choice-review-kind").assertTextContains("Game")
+        compose.waitUntil(15000) { compose.onAllNodesWithText("Review search").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(0, queries); assertNull(applied)
+        compose.onAllNodesWithText("Search title").onLast().performTextReplacement("Super Mario Odyssey")
+        compose.onNodeWithTag("choice-search-kind").performScrollTo().performClick()
+        compose.onNodeWithText("Game", substring = false).performClick()
+        compose.onNodeWithText("Find matches").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Choose a match").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(1, queries); assertNull(applied)
+        compose.onNodeWithText("Super Mario Odyssey").performClick()
         val directory = File(context.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         File(directory, "17-cover-review.png").outputStream().use {
             compose.onNode(isDialog()).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
-        assertNull(applied)
         compose.onNodeWithText("Use details").performClick()
         compose.waitUntil(5000) { applied != null }
-        assertEquals("Super Mario Odyssey", applied!!.title)
-        assertEquals("Game", applied!!.kind)
+        assertEquals("Super Mario Odyssey", applied!!.title); assertEquals("Game", applied!!.kind)
         assertEquals("Nintendo Switch", applied!!.attributes["platform"])
-        assertEquals("", applied!!.creator)
         file.delete()
     }
 
