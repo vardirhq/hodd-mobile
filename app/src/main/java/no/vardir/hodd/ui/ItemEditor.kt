@@ -44,7 +44,7 @@ import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemEditor(
     existing: CatalogItem?, collections: List<Collection>, preferredCollectionId: String?, busy: Boolean,
